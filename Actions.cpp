@@ -20,7 +20,7 @@
 
 
 #include "Actions.h"
-#include "Leds.h"
+#include "FastLED_Action.h"
 
 ActionsContainer::ActionsContainer() :
   m_currentIdx(0)

@@ -18,7 +18,7 @@
 *      Author: Fredrik Johansson
 */
 
-#include "Leds.h"
+#include "FastLED_Action.h"
 
 /*
 SegmentPart::SegmentPart(CLEDController *controller,
