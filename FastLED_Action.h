@@ -53,16 +53,40 @@ public:
 };
 */
 
+
+class SegmentCommon;
+class Segment;
+class SegmentCompound;
+
+class FastLED_Action {
+  DListDynamic<SegmentCommon*> m_items;
+  static FastLED_Action s_instance;
+  void _registerItem(SegmentCommon *item);
+  void _unregisterItem(SegmentCommon *item);
+public:
+  FastLED_Action();
+  ~FastLED_Action();
+
+  /// register a new item that should be called each loop
+  static void registerItem(SegmentCommon *item);
+  /// unregister a item form beeing called on each loop
+  static void unregisterItem(SegmentCommon *item);
+  /// gets a ref to global singleton of this class
+  static FastLED_Action &instance();
+  /// should be called from loop() in root *.ino file
+  static void loop();
+};
+
+
 //--------------------------------------------------------------
 
 /**
  * @breif: Abstract base for all segments
  */
 class SegmentCommon : public ActionsContainer {
-protected:
-  bool m_halted;
 public:
-  explicit SegmentCommon();
+  enum typeEnum : uint8_t { T_InValid, T_Segment, T_Compound };
+  explicit SegmentCommon(typeEnum type);
   virtual ~SegmentCommon();
 
   // halted status
@@ -77,6 +101,17 @@ public:
   virtual uint16_t size() = 0;
 
   void render();
+
+
+  /// waits for next action to occur
+  /// if duration is 0 (forever action) or if we are halted
+  /// it returns immediately
+  /// returns time in ms that it has been of
+  uint32_t yieldUntilNextAction();
+
+protected:
+  typeEnum m_type;
+  bool m_halted;
 };
 
 // ---------------------------------------------------------
@@ -95,11 +130,16 @@ public:
   // a segment might be contained within several different data I/O pins
   // hence might have many controllers
   void addLedController(CLEDController *part);
+  size_t ledControllerSize() const;
+  void removeLedController(size_t idx);
+  CLEDController* ledControllerAt(size_t idx);
   ControllerList &controllerList();
 
   // LEDs
   CRGB *operator [] (uint16_t idx);
   uint16_t size();
+
+  void render();
 private:
   ControllerList m_ledControllers;
 };
@@ -111,8 +151,9 @@ private:
  * ie like different segments of a logo
  */
 class SegmentCompound : public SegmentCommon {
-  DListDynamic<Segment*> m_segments;
 public:
+  typedef DListDynamic<Segment*> SegmentList;
+  typedef DListDynamic<SegmentCompound*> CompoundList;
   SegmentCompound();
   ~SegmentCompound();
 
@@ -121,10 +162,24 @@ public:
   size_t segmentSize() const;
   void removeSegment(size_t idx);
   Segment* segmentAt(size_t idx);
+  SegmentList &segmentsList();
+
+  /// add sub compound to this compound
+  void addCompound(SegmentCompound *compound);
+  size_t compoundSize() const;
+  void removeCompound(size_t idx);
+  SegmentCompound* compoundAt(size_t idx);
+  CompoundList &compoundList();
 
   // LEDs
   CRGB *operator [] (uint16_t idx);
   uint16_t size();
+
+  void render();
+
+private:
+  SegmentList m_segments;
+  CompoundList m_compounds;
 };
 
 #endif /* FASTLED_ACTION_H_ */

@@ -27,6 +27,7 @@
 class SegmentCommon;
 class ActionBase;
 
+extern uint32_t cRgbToUInt(CRGB &rgb);
 
 /**
  * @brief: base class for Segment and SegmentCompound
@@ -42,11 +43,13 @@ public:
 
   // Actions
   size_t actionsSize() const;
-  void actionsPush(ActionBase *action);
-  void actionsRemove(ActionBase *action);
-  void actionsRestart();
+  void addAction(ActionBase *action);
+  void removeAction(ActionBase *action);
   ActionBase* actionsCurrent();
   void nextAction();
+  uint16_t currentActionIdx();
+  void setCurrentActionIdx(uint16_t idx);
+  ActionBase *currentAction();
 };
 
 // ----------------------------------------------------------
@@ -57,9 +60,11 @@ public:
 class ActionBase {
 protected:
   bool m_singleShot;
-  unsigned long m_startTime;
+  unsigned long m_endTime;
   uint32_t m_duration;
   static const uint8_t m_updateTime;
+  typedef void (*loopCallback)(ActionBase *self, SegmentCommon *owner);
+  loopCallback m_loopCB;
 
 public:
   /// action takes this long in milliseconds
@@ -71,6 +76,11 @@ public:
   /// duration of 0 is a forever action
   uint32_t duration() const { return m_duration; }
 
+  uint32_t startTime() const {
+    return m_endTime > 0 ? m_endTime - m_duration : 0;
+  }
+  uint32_t endTime() const { return m_endTime; }
+
   bool isSingleShot() const { return m_singleShot; }
   void setSingleShot(bool singleShot) { m_singleShot = singleShot; }
 
@@ -78,6 +88,7 @@ public:
   virtual bool isFinished() const;
   virtual void reset();
 
+  void loopDelegate(SegmentCommon *owner);
   virtual void loop(SegmentCommon *owner); // subclass must implement functionality
 };
 
@@ -90,6 +101,8 @@ public:
   explicit ActionColor(CRGB color, uint32_t duration = 1000);
   virtual ~ActionColor();
 
+  // workaround as we need to upcast to this class on each loop
+  static void loopCB(ActionBase *self, SegmentCommon *owner);
   virtual void loop(SegmentCommon *owner);
 };
 
@@ -111,6 +124,8 @@ public:
   explicit ActionIncColor(CRGB leftColor, CRGB rightColor, uint32_t duration = 1000);
   virtual ~ActionIncColor();
 
+  // workaround as we need to upcast to this class on each loop
+  static void loopCB(ActionBase *self, SegmentCommon *owner);
   virtual void loop(SegmentCommon *owner);
 };
 
@@ -126,6 +141,8 @@ public:
   explicit ActionDimAll(CRGB fromColor, CRGB toColor, uint32_t duration = 1000);
   virtual ~ActionDimAll();
 
+  // workaround as we need to upcast to this class on each loop
+  static void loopCB(ActionBase *self, SegmentCommon *owner);
   virtual void loop(SegmentCommon *owner);
   virtual void reset();
 };

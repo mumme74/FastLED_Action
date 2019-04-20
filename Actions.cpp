@@ -22,6 +22,17 @@
 #include "Actions.h"
 #include "FastLED_Action.h"
 
+
+uint32_t cRgbToUInt(CRGB &rgb){
+  uint32_t col = rgb.r;
+  col <<= 8;
+  col |= rgb.g;
+  col <<= 8;
+  col |= rgb.b;
+  return col;
+}
+
+
 ActionsContainer::ActionsContainer() :
   m_currentIdx(0)
 {
@@ -36,29 +47,24 @@ size_t ActionsContainer::actionsSize() const
   return m_actions.length();
 }
 
-void ActionsContainer::actionsPush(ActionBase *action)
+void ActionsContainer::addAction(ActionBase *action)
 {
   m_actions.push(action);
 }
 
-void ActionsContainer::actionsRemove(ActionBase *action)
+void ActionsContainer::removeAction(ActionBase *action)
 {
+  Serial.println("remove action");
   for(uint16_t i = 0; i < m_actions.length(); ++i) {
     if (m_actions[i] == action) {
       m_actions.remove(i);
       if (m_currentIdx == i) {
         if (m_actions.length() -1 <= i)
-          actionsRestart();
+          setCurrentActionIdx(0);
       } else if (m_currentIdx > i)
         --m_currentIdx;
     }
   }
-}
-
-void ActionsContainer::actionsRestart()
-{
-  m_currentIdx = 0;
-  m_actions[m_currentIdx]->reset();
 }
 
 ActionBase* ActionsContainer::actionsCurrent()
@@ -70,18 +76,40 @@ ActionBase* ActionsContainer::actionsCurrent()
 
 void ActionsContainer::nextAction()
 {
+  //m_actions[m_currentIdx]->reset();
   ++m_currentIdx;
   if (m_actions.length() == m_currentIdx)
     m_currentIdx = 0;
 
-  m_actions[m_currentIdx]->reset();
+  Serial.print("next action:");Serial.println(m_currentIdx);
 }
+
+uint16_t ActionsContainer::currentActionIdx()
+{
+  return m_currentIdx;
+}
+
+void ActionsContainer::setCurrentActionIdx(uint16_t idx)
+{
+  if (idx < m_actions.length()) {
+    m_currentIdx = idx;
+    m_actions[idx]->reset();
+  }
+}
+
+ActionBase* ActionsContainer::currentAction()
+{
+  if (m_actions.length() > m_currentIdx)
+    return m_actions[m_currentIdx];
+  return nullptr; // when empty
+}
+
 
 // -------------------------------------------------------
 
 ActionBase::ActionBase(uint32_t duration) :
-  m_singleShot(false), m_startTime(0),
-  m_duration(duration)
+  m_singleShot(false), m_endTime(0),
+  m_duration(duration), m_loopCB(nullptr)
 {
 }
 
@@ -94,33 +122,47 @@ ActionBase::~ActionBase()
 
 bool ActionBase::isRunning() const
 {
-  return m_startTime > 0 && !isFinished();
+  return m_endTime > 0;
 }
 
 bool ActionBase::isFinished() const
 {
   // duration of 0 is forever
-  return m_duration > 0 && m_startTime + m_duration >= millis();
+  return m_duration > 0 && m_endTime <= millis();
 }
 
 void ActionBase::reset()
 {
-  m_startTime = 0;
+  Serial.println("reset");
+  m_endTime = 0;
+}
+
+void ActionBase::loopDelegate(SegmentCommon *owner)
+{
+  if(m_loopCB)
+    (*m_loopCB)(this, owner);
+  else
+    loop(owner);
 }
 
 void ActionBase::loop(SegmentCommon *owner)
 {
-  if (m_startTime == 0)
-    m_startTime = millis();
+  if (m_endTime == 0)
+    m_endTime = millis() + m_duration;
 
   if (isFinished()) {
-    if (m_singleShot)
-      owner->actionsRemove(this); // caution, deletes this,
+    Serial.print("loop:");Serial.print(m_duration);Serial.print(" ");
+    Serial.print(m_endTime);Serial.print(" ");Serial.println(millis());
+    reset();
+    if (m_singleShot) {
+      Serial.println("remove");
+      owner->removeAction(this); // caution, deletes this,
                                   // no code execution after this line
-    else
+    } else
       owner->nextAction();
   }
 }
+
 
 // --------------------------------------------------
 
@@ -128,15 +170,24 @@ ActionColor::ActionColor(CRGB color, uint32_t duration) :
     ActionBase(duration),
     m_color(color)
 {
+  m_loopCB = &ActionColor::loopCB;
 }
 
 ActionColor::~ActionColor()
 {
 }
 
+// static
+void ActionColor::loopCB(ActionBase *self, SegmentCommon *owner)
+{
+  reinterpret_cast<ActionColor*>(self)->loop(owner);
+}
+
 void ActionColor::loop(SegmentCommon *owner)
 {
-  if (m_startTime == 0) {
+  if (m_endTime == 0) {
+    Serial.print("start color loop:");Serial.println(cRgbToUInt(m_color), 16);
+    Serial.print("this:");Serial.println((int)this);
     for(uint16_t i = 0, end = owner->size(); i < end; ++i) {
       CRGB *rgb = (*owner)[i];
       *rgb = m_color;
@@ -169,9 +220,15 @@ ActionIncColor::~ActionIncColor()
 {
 }
 
+// static
+void ActionIncColor::loopCB(ActionBase *self, SegmentCommon *owner)
+{
+  reinterpret_cast<ActionIncColor*>(self)->loop(owner);
+}
+
 void ActionIncColor::loop(SegmentCommon *owner)
 {
-  if (m_startTime == 0) {
+  if (m_endTime == 0) {
     int16_t diff[3] = {
         m_leftColor.red - m_rightColor.red,
         m_leftColor.green - m_rightColor.green,
@@ -223,10 +280,16 @@ ActionDimAll::~ActionDimAll()
 {
 }
 
+// static
+void ActionDimAll::loopCB(ActionBase *self, SegmentCommon *owner)
+{
+  reinterpret_cast<ActionDimAll*>(self)->loop(owner);
+}
+
 void ActionDimAll::loop(SegmentCommon *owner)
 {
   uint8_t r, g, b;
-  if (m_startTime == 0) {
+  if (m_endTime == 0) {
     r = m_fromColor.red;
     g = m_fromColor.green;
     b = m_fromColor.blue;
@@ -236,7 +299,8 @@ void ActionDimAll::loop(SegmentCommon *owner)
     b = m_toColor.blue - (m_iterations * m_incB);
   }
 
-  if (m_startTime == 0 || m_startTime + m_nextIterTime <= millis()) {
+  uint32_t startTime = m_endTime - m_duration;
+  if (m_endTime == 0 || startTime + m_nextIterTime <= millis()) {
     m_nextIterTime = millis() + m_updateTime;
     for(uint16_t i = 0, end = owner->size(); i < end; ++i) {
       CRGB *rgb = (*owner)[i];

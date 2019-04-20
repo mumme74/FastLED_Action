@@ -1,0 +1,38 @@
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+**Error: ((uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black) -> (1 == 0) at line 35
+passed (uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black at line: 35
+passed (uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black at line: 35
+passed (uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black at line: 35
+passed (uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black at line: 35
+passed (uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black at line: 35
+passed (uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black at line: 35
+passed (uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black at line: 35
+passed (uint32_t)leds_ch1[i] == (uint32_t)CRGB::Black at line: 35
+passed (uint32_t)leds_ch1[i] == (uint32
