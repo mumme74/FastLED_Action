@@ -115,7 +115,8 @@ ActionBase* ActionsContainer::currentAction()
 
 ActionBase::ActionBase(uint32_t duration) :
   m_singleShot(false), m_endTime(0),
-  m_duration(duration), m_loopCB(nullptr)
+  m_nextIterTime(m_updateTime),
+  m_duration(duration), m_eventCB(nullptr)
 {
 }
 
@@ -143,23 +144,24 @@ void ActionBase::reset()
   m_endTime = 0;
 }
 
-void ActionBase::loopDelegate(SegmentCommon *owner)
-{
-  if(m_loopCB)
-    (*m_loopCB)(this, owner);
-  else
-    loop(owner);
-}
-
 void ActionBase::loop(SegmentCommon *owner)
 {
-  if (m_endTime == 0)
+  if (m_endTime == 0) {
     m_endTime = millis() + m_duration;
+    m_nextIterTime = millis() + m_updateTime;
+    eventDelegate(owner, Start);
+  } else if (m_nextIterTime <= millis()) {
+    m_nextIterTime = millis() + m_updateTime;
+    eventDelegate(owner, Tick);
+  }
+
 
   if (isFinished()) {
-    Serial.print("loop:");Serial.print(m_duration);Serial.print(" ");
-    Serial.print(m_endTime);Serial.print(" ");Serial.println(millis());
+    eventDelegate(owner, End);
+    //Serial.print("loop:");Serial.print(m_duration);Serial.print(" ");
+    //Serial.print(m_endTime);Serial.print(" ");Serial.println(millis());
     reset();
+
     if (m_singleShot) {
       Serial.println("remove");
       owner->removeAction(this); // caution, deletes this,
@@ -169,6 +171,13 @@ void ActionBase::loop(SegmentCommon *owner)
   }
 }
 
+void ActionBase::eventDelegate(SegmentCommon *owner, EvtType evtType)
+{
+  if(m_eventCB)
+    (*m_eventCB)(this, owner, evtType);
+  else
+    onEvent(owner, evtType);
+}
 
 // --------------------------------------------------
 
@@ -176,7 +185,7 @@ ActionColor::ActionColor(CRGB color, uint32_t duration) :
     ActionBase(duration),
     m_color(color)
 {
-  m_loopCB = &ActionColor::loopCB;
+  m_eventCB = &ActionColor::eventCB;
 }
 
 ActionColor::~ActionColor()
@@ -184,24 +193,20 @@ ActionColor::~ActionColor()
 }
 
 // static
-void ActionColor::loopCB(ActionBase *self, SegmentCommon *owner)
+void ActionColor::eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType)
 {
-  reinterpret_cast<ActionColor*>(self)->loop(owner);
+  reinterpret_cast<ActionColor*>(self)->onEvent(owner, evtType);
 }
 
-void ActionColor::loop(SegmentCommon *owner)
+void ActionColor::onEvent(SegmentCommon *owner, EvtType evtType)
 {
-  if (m_endTime == 0) {
-    //Serial.print("start color loop:");Serial.println(cRgbToUInt(m_color), 16);
-    //Serial.print("this:");Serial.println((int)this);
+  if (evtType == Start) {
     for(uint16_t i = 0, end = owner->size(); i < end; ++i) {
       CRGB *rgb = (*owner)[i];
       *rgb = m_color;
     }
     owner->dirty();
   }
-
-  ActionBase::loop(owner);
 }
 
 // -----------------------------------------------
@@ -216,25 +221,25 @@ ActionDark::~ActionDark()
 }
 
 // -----------------------------------------------
-ActionIncColor::ActionIncColor(CRGB leftColor, CRGB rightColor, uint32_t duration) :
+ActionColorLadder::ActionColorLadder(CRGB leftColor, CRGB rightColor, uint32_t duration) :
     ActionBase(duration),
     m_leftColor(leftColor), m_rightColor(rightColor)
 {
 }
 
-ActionIncColor::~ActionIncColor()
+ActionColorLadder::~ActionColorLadder()
 {
 }
 
 // static
-void ActionIncColor::loopCB(ActionBase *self, SegmentCommon *owner)
+void ActionColorLadder::eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType)
 {
-  reinterpret_cast<ActionIncColor*>(self)->loop(owner);
+  reinterpret_cast<ActionColorLadder*>(self)->onEvent(owner, evtType);
 }
 
-void ActionIncColor::loop(SegmentCommon *owner)
+void ActionColorLadder::onEvent(SegmentCommon *owner, EvtType evtType)
 {
-  if (m_endTime == 0) {
+  if (evtType == Start) {
     int16_t diff[3] = {
         m_leftColor.red - m_rightColor.red,
         m_leftColor.green - m_rightColor.green,
@@ -252,17 +257,14 @@ void ActionIncColor::loop(SegmentCommon *owner)
     }
     owner->dirty();
   }
-
-  ActionBase::loop(owner);
 }
 
 
 // -----------------------------------------------
 
-ActionDimAll::ActionDimAll(CRGB fromColor, CRGB toColor, uint32_t duration) :
+ActionGotoColor::ActionGotoColor(CRGB fromColor, CRGB toColor, uint32_t duration) :
     ActionBase(duration),
-    m_fromColor(fromColor), m_toColor(toColor),
-    m_nextIterTime(m_updateTime)
+    m_fromColor(fromColor), m_toColor(toColor)
 {
   // calculate how far away each color is and how much they should change each 70ms
   int16_t redDiff   = toColor.red - fromColor.red,
@@ -282,49 +284,45 @@ ActionDimAll::ActionDimAll(CRGB fromColor, CRGB toColor, uint32_t duration) :
   m_incB = (blueDiff / m_iterations) || 1;
 }
 
-ActionDimAll::~ActionDimAll()
+ActionGotoColor::~ActionGotoColor()
 {
 }
 
 // static
-void ActionDimAll::loopCB(ActionBase *self, SegmentCommon *owner)
+void ActionGotoColor::eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType)
 {
-  reinterpret_cast<ActionDimAll*>(self)->loop(owner);
+  reinterpret_cast<ActionGotoColor*>(self)->onEvent(owner, evtType);
 }
 
-void ActionDimAll::loop(SegmentCommon *owner)
+void ActionGotoColor::onEvent(SegmentCommon *owner, EvtType evtType)
 {
   uint8_t r, g, b;
-  if (m_endTime == 0) {
+  switch(evtType) {
+  case Start:
     r = m_fromColor.red;
     g = m_fromColor.green;
     b = m_fromColor.blue;
-  } else {
-    r = m_toColor.red - (m_iterations * m_incR);
-    g = m_toColor.green - (m_iterations * m_incG);
-    b = m_toColor.blue - (m_iterations * m_incB);
+    break;
+  case Tick:
+    r = m_toColor.red - m_incR;
+    g = m_toColor.green - m_incG;
+    b = m_toColor.blue - m_incB;
+    break;
+  case End: // fallthrough
+  default:
+    r = m_toColor.red;
+    g = m_toColor.green;
+    b = m_toColor.blue;
   }
 
-  uint32_t startTime = m_endTime - m_duration;
-  if (m_endTime == 0 || startTime + m_nextIterTime <= millis()) {
-    m_nextIterTime = millis() + m_updateTime;
-    for(uint16_t i = 0, end = owner->size(); i < end; ++i) {
-      CRGB *rgb = (*owner)[i];
-      rgb->red = r;
-      rgb->green = g;
-      rgb->blue = b;
-    }
-    owner->dirty();
+  m_nextIterTime = millis() + m_updateTime;
+  for(uint16_t i = 0, end = owner->size(); i < end; ++i) {
+    CRGB *rgb = (*owner)[i];
+    rgb->red = r;
+    rgb->green = g;
+    rgb->blue = b;
   }
-
-  // call subclass
-  ActionBase::loop(owner);
-}
-
-void ActionDimAll::reset()
-{
-  m_nextIterTime = m_updateTime;
-  ActionBase::reset();
+  owner->dirty();
 }
 
 

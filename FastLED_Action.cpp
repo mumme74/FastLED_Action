@@ -175,7 +175,7 @@ void SegmentCommon::loop()
 {
   if (!m_halted && m_actions.length()) {
     ActionBase *action = m_actions[m_currentIdx];
-    action->loopDelegate(this);
+    action->loop(this);
   }
 }
 
@@ -226,7 +226,7 @@ void Segment::addSegmentPart(SegmentPart *part)
   m_segmentParts.push(part);
 }
 
-size_t Segment::ledSegmentPartSize() const
+size_t Segment::segmentPartSize() const
 {
   return m_segmentParts.length();
 }

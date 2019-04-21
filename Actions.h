@@ -60,12 +60,14 @@ public:
  */
 class ActionBase {
 protected:
+  enum EvtType : uint8_t { Start, Tick, End };
   bool m_singleShot;
-  unsigned long m_endTime;
-  uint32_t m_duration;
+  uint32_t m_endTime,
+           m_nextIterTime,
+           m_duration;
   static const uint8_t m_updateTime;
-  typedef void (*loopCallback)(ActionBase *self, SegmentCommon *owner);
-  loopCallback m_loopCB;
+  typedef void (*eventCallback)(ActionBase *self, SegmentCommon *owner, EvtType evtType);
+  eventCallback m_eventCB;
 
 public:
   /// action takes this long in milliseconds
@@ -89,8 +91,12 @@ public:
   virtual bool isFinished() const;
   virtual void reset();
 
-  void loopDelegate(SegmentCommon *owner);
+  // events, subclasses implement
+  virtual void onEvent(SegmentCommon *owner, EvtType evtType) {}
+
   virtual void loop(SegmentCommon *owner); // subclass must implement functionality
+private:
+  void eventDelegate(SegmentCommon *owner, EvtType evtType);
 };
 
 // ----------------------------------------------------
@@ -102,9 +108,9 @@ public:
   explicit ActionColor(CRGB color, uint32_t duration = 1000);
   virtual ~ActionColor();
 
-  // workaround as we need to upcast to this class on each loop
-  static void loopCB(ActionBase *self, SegmentCommon *owner);
-  virtual void loop(SegmentCommon *owner);
+  // workaround as we need to upcast to this class on each event
+  static void eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType);
+  virtual void onEvent(SegmentCommon *owner, EvtType evtType);
 };
 
 // ----------------------------------------------------
@@ -119,33 +125,31 @@ public:
 // ----------------------------------------------------
 
 /// sets all leds to a increasing color from left to right
-class ActionIncColor : public ActionBase {
+class ActionColorLadder : public ActionBase {
   CRGB m_leftColor, m_rightColor;
 public:
-  explicit ActionIncColor(CRGB leftColor, CRGB rightColor, uint32_t duration = 1000);
-  virtual ~ActionIncColor();
+  explicit ActionColorLadder(CRGB leftColor, CRGB rightColor, uint32_t duration = 1000);
+  virtual ~ActionColorLadder();
 
   // workaround as we need to upcast to this class on each loop
-  static void loopCB(ActionBase *self, SegmentCommon *owner);
-  virtual void loop(SegmentCommon *owner);
+  static void eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType);
+  virtual void onEvent(SegmentCommon *owner, EvtType evtType);
 };
 
 // ----------------------------------------------------
 
 /// dims all leds simultaneously from -> to during duration time
-class ActionDimAll : public ActionBase {
+class ActionGotoColor : public ActionBase {
   CRGB m_fromColor, m_toColor;
-  uint16_t m_nextIterTime, // m_startTime + m_nextIterTime is when we update
-           m_iterations;
+  uint16_t m_iterations;
   int16_t m_incR, m_incG, m_incB;
 public:
-  explicit ActionDimAll(CRGB fromColor, CRGB toColor, uint32_t duration = 1000);
-  virtual ~ActionDimAll();
+  explicit ActionGotoColor(CRGB fromColor, CRGB toColor, uint32_t duration = 1000);
+  virtual ~ActionGotoColor();
 
-  // workaround as we need to upcast to this class on each loop
-  static void loopCB(ActionBase *self, SegmentCommon *owner);
-  virtual void loop(SegmentCommon *owner);
-  virtual void reset();
+  // workaround as we need to upcast to this class on each event
+  static void eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType);
+  virtual void onEvent(SegmentCommon *owner, EvtType evtType);
 };
 
 // -----------------------------------------------------

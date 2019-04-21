@@ -26,7 +26,7 @@ void checkTime(uint32_t time, uint32_t maxTime, int line){
   } else {
     Serial.print("Time took:");Serial.print(time);
   }
-  Serial.print(" at ");Serial.println(line);
+  Serial.print(" at line: ");Serial.println(line);
   ++_testsCnt;
 }
 
@@ -345,20 +345,107 @@ void testCompound(){
   comp2.yieldUntilNextAction();
   FastLED_Action::loop();
 
+  // make sure we have detached first compound for loop control
   checkAllSegmentPartColors(segPart1_ch1, CRGB::Bisque, __LINE__);
   checkAllSegmentPartColors(segPart2_ch1, CRGB::Bisque, __LINE__);
   checkAllSegmentPartColors(segPart3_ch1, CRGB::Bisque, __LINE__);
   checkAllSegmentPartColors(segPart1_ch2, CRGB::Bisque, __LINE__);
   checkAllSegmentPartColors(segPart2_ch2, CRGB::Bisque, __LINE__);
   checkAllSegmentPartColors(segPart1_ch3, CRGB::Bisque, __LINE__);
+}
+
+void testActions(){
+  setAllBlack();
+
+    CLEDController
+      *cont_ch1 = &FastLED.addLeds<UCS1903, OUTPIN_CH1, BRG>(leds_ch1, NUMLEDS_CH1);
+    Segment seg1;
+    SegmentPart segPart1_ch1(cont_ch1, 10, 15),
+                segPart2_ch1(cont_ch1, 30, 20),
+                segPart3_ch1(cont_ch1, 55, 25);
+
+    seg1.addSegmentPart(&segPart1_ch1);
+    seg1.addSegmentPart(&segPart2_ch1);
+    seg1.addSegmentPart(&segPart3_ch1);
+    test(seg1.segmentPartsList().length(), 3);
+
+    ActionColor actColor1(CRGB::Red),
+                actColor2(CRGB::Green),
+                actColor3(CRGB::Blue);
+
+    seg1.addAction(&actColor1);
+    seg1.addAction(&actColor2);
+    seg1.addAction(&actColor3);
+
+    actColor1.setSingleShot(true);
+    actColor2.setSingleShot(true);
+    actColor3.setSingleShot(true);
+
+    // test singleshot
+    test(seg1.actionsSize(), 3);
+    FastLED_Action::loop();
+    checkAllSegmentPartColors(segPart1_ch1, CRGB::Red, __LINE__);
+    checkAllSegmentPartColors(segPart2_ch1, CRGB::Red, __LINE__);
+    checkAllSegmentPartColors(segPart3_ch1, CRGB::Red, __LINE__);
+
+    seg1.yieldUntilNextAction();
+    FastLED_Action::loop();
+    test(seg1.actionsSize(), 2);
+
+    checkAllSegmentPartColors(segPart1_ch1, CRGB::Green, __LINE__);
+    checkAllSegmentPartColors(segPart2_ch1, CRGB::Green, __LINE__);
+    checkAllSegmentPartColors(segPart3_ch1, CRGB::Green, __LINE__);
+
+    seg1.yieldUntilNextAction();
+    FastLED_Action::loop();
+    test(seg1.actionsSize(), 1);
+
+    checkAllSegmentPartColors(segPart1_ch1, CRGB::Blue, __LINE__);
+    checkAllSegmentPartColors(segPart2_ch1, CRGB::Blue, __LINE__);
+    checkAllSegmentPartColors(segPart3_ch1, CRGB::Blue, __LINE__);
+
+    seg1.yieldUntilNextAction();
+    FastLED_Action::loop();
+    test(seg1.actionsSize(), 0);
+
+    // done testing singleshot/autoremove
+    ActionGotoColor actGoColor1(CRGB::Aqua, CRGB::Orange),
+                    actGoColor2(CRGB::Orange, CRGB::DarkGray, 2000),
+                    actGoColor3(CRGB::DarkGray, CRGB::Red, 900);
+    seg1.addAction(&actGoColor1);
+    seg1.addAction(&actGoColor2);
+    seg1.addAction(&actGoColor3);
+
+    FastLED_Action::loop();
+    uint32_t time = millis();
+    checkAllSegmentPartColors(segPart1_ch1, CRGB::Aqua, __LINE__);
+    seg1.yieldUntilNextAction();
+    checkTime(millis() - time, 1050, __LINE__);
+    FastLED_Action::loop();
+    time = millis();
+    checkAllSegmentPartColors(segPart1_ch1, CRGB::Orange, __LINE__);
+    seg1.yieldUntilNextAction();
+    checkTime(millis() - time, 2050, __LINE__);
+    FastLED_Action::loop();
+    time = millis();
+    checkAllSegmentPartColors(segPart1_ch1, CRGB::DarkGray, __LINE__);
+    seg1.yieldUntilNextAction();
+    checkTime(millis() - time, 950, __LINE__);
+    testTypeHint((uint32_t)seg1.currentAction(), (uint32_t)&actGoColor1, uint32_t);
+    checkAllSegmentPartColors(segPart1_ch1, CRGB::Red, __LINE__);
+
+
+
 
 }
 
 void runTests(){
   testBegin();
+
   testSingleChSegment();
   testSegmentManyChannels();
   testCompound();
+  testActions();
 
 
   testEnd();

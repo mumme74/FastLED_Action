@@ -136,7 +136,7 @@ public:
   // a segment might be contained within several different data I/O pins
   // hence might have many controllers
   void addSegmentPart(SegmentPart *part);
-  size_t ledSegmentPartSize() const;
+  size_t segmentPartSize() const;
   void removeSegmentPart(size_t idx);
   SegmentPart* segmentPartAt(size_t idx);
   PartsList &segmentPartsList();
