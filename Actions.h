@@ -65,7 +65,8 @@ protected:
   uint32_t m_endTime,
            m_nextIterTime,
            m_duration;
-  static const uint8_t m_updateTime;
+  static const uint8_t DefaultTickMs;
+  uint8_t m_updateTime;
   typedef void (*eventCallback)(ActionBase *self, SegmentCommon *owner, EvtType evtType);
   eventCallback m_eventCB;
 

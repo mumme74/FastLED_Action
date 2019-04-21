@@ -434,9 +434,19 @@ void testActions(){
     testTypeHint((uint32_t)seg1.currentAction(), (uint32_t)&actGoColor1, uint32_t);
     checkAllSegmentPartColors(segPart1_ch1, CRGB::Red, __LINE__);
 
+    seg1.removeAction(&actGoColor1);
+    seg1.removeAction(&actGoColor2);
+    seg1.removeAction(&actGoColor3);
 
+    // test Color Ladder
+    ActionColorLadder actLadder1(CRGB::Black, CRGB::White);
+    seg1.addAction(&actLadder1);
 
-
+    FastLED_Action::loop();
+    testTypeHint(cRgbToUInt(*seg1[0]), CRGB::Black, uint32_t);
+    testTypeHint(cRgbToUInt(*seg1[(seg1.size() +1) / 2]), 0x828282, uint32_t);
+    testTypeHint(cRgbToUInt(*seg1[seg1.size() -1]), 0xFFFFFF, uint32_t);
+    seg1.yieldUntilNextAction();
 }
 
 void runTests(){

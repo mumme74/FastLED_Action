@@ -115,13 +115,14 @@ ActionBase* ActionsContainer::currentAction()
 
 ActionBase::ActionBase(uint32_t duration) :
   m_singleShot(false), m_endTime(0),
-  m_nextIterTime(m_updateTime),
-  m_duration(duration), m_eventCB(nullptr)
+  m_nextIterTime(0),
+  m_duration(duration), m_updateTime(DefaultTickMs),
+  m_eventCB(nullptr)
 {
 }
 
 // how many ms between each re-render
-const uint8_t ActionBase::m_updateTime = 70;
+const uint8_t ActionBase::DefaultTickMs = 70;
 
 ActionBase::~ActionBase()
 {
@@ -141,7 +142,7 @@ bool ActionBase::isFinished() const
 void ActionBase::reset()
 {
   Serial.println("reset");
-  m_endTime = 0;
+  m_endTime = m_nextIterTime = 0;
 }
 
 void ActionBase::loop(SegmentCommon *owner)
@@ -240,19 +241,21 @@ void ActionColorLadder::eventCB(ActionBase *self, SegmentCommon *owner, EvtType 
 void ActionColorLadder::onEvent(SegmentCommon *owner, EvtType evtType)
 {
   if (evtType == Start) {
-    int16_t diff[3] = {
-        m_leftColor.red - m_rightColor.red,
+    int16_t diff[] = {
+        m_leftColor.red   - m_rightColor.red,
         m_leftColor.green - m_rightColor.green,
         m_leftColor.blue  - m_rightColor.blue
     };
 
+    uint16_t sz = owner->size();
     for (uint8_t c = 0; c < 3; ++c) {
       // iterate for each color
-      for(uint16_t i = 0, sz = owner->size(); i < sz; ++i) {
-        float color = diff[c] / sz;
-        color = m_leftColor.raw[c] + (color * i);
+      float color = (float)diff[c] / (sz-1);
+
+      for(uint16_t i = 0; i < sz; ++i) {
+        float col = m_leftColor.raw[c] - (color * i);
         CRGB *rgb = (*owner)[i];
-        rgb->raw[c] = round(color);
+        rgb->raw[c] = round(col);
       }
     }
     owner->dirty();
@@ -315,7 +318,6 @@ void ActionGotoColor::onEvent(SegmentCommon *owner, EvtType evtType)
     b = m_toColor.blue;
   }
 
-  m_nextIterTime = millis() + m_updateTime;
   for(uint16_t i = 0, end = owner->size(); i < end; ++i) {
     CRGB *rgb = (*owner)[i];
     rgb->red = r;
