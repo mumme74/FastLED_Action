@@ -20,37 +20,11 @@
 
 #include "FastLED_Action.h"
 
-/*
-SegmentPart::SegmentPart(CLEDController *controller,
-                         uint8_t firstLed,
-                         uint8_t noLeds) :
-    m_firstIdx(firstLed), m_noLeds(noLeds),
-    m_ledController(controller), m_hasChanges(false)
-{
-}
-
-SegmentPart::~SegmentPart()
-{
-}
-
-void SegmentPart::setLedController(CLEDController *controller)
-{
-  m_ledController = controller;
-}
-
-CRGB *SegmentPart::operator [] (uint8_t idx) const
-{
-  uint16_t i = m_firstIdx + idx;
-  if (m_ledController->size() <= (int)i)
-    return nullptr;
-  return &m_ledController->leds()[i];
-}
-*/
-
-// --------------------------------------------------------------------
 
 FastLED_Action::FastLED_Action()
 {
+  for(int i = 0; i < MAX_CHANNEL_COUNT; ++i)
+    m_dirtyControllers[i] = nullptr;
 }
 
 FastLED_Action::~FastLED_Action()
@@ -103,6 +77,74 @@ void FastLED_Action::loop()
   {
     itm->loop();
   }
+  s_instance._render();
+}
+
+void FastLED_Action::_render()
+{
+  // render changes
+  for(int i = MAX_CHANNEL_COUNT -1; i >= 0; --i) {
+    CLEDController *cont = m_dirtyControllers[i];
+    if (cont != nullptr) {
+      cont->showLeds();
+      m_dirtyControllers[i] = nullptr;
+    }
+  }
+}
+
+void FastLED_Action::setLedControllerHasChanges(CLEDController *controller)
+{
+  for(int i = 0; i < MAX_CHANNEL_COUNT; ++i) {
+    CLEDController *cont = m_dirtyControllers[i];
+    if (cont == controller)
+      return; // already dirty
+    if (cont == nullptr) {
+      m_dirtyControllers[i] = controller;
+      return;
+    }
+  }
+}
+
+bool FastLED_Action::ledControllerHasChanges(CLEDController *controller)
+{
+  for(int i = 0; i < MAX_CHANNEL_COUNT; ++i) {
+    CLEDController *cont = m_dirtyControllers[i];
+    if (cont == controller)
+      return true; // already dirty
+  }
+  return false;
+}
+
+// --------------------------------------------------------------------
+
+SegmentPart::SegmentPart(CLEDController *controller,
+                         uint8_t firstLed,
+                         uint8_t noLeds) :
+    m_firstIdx(firstLed), m_noLeds(noLeds),
+    m_ledController(controller)
+{
+}
+
+SegmentPart::~SegmentPart()
+{
+}
+
+void SegmentPart::setLedController(CLEDController *controller)
+{
+  m_ledController = controller;
+}
+
+CRGB *SegmentPart::operator [] (uint8_t idx) const
+{
+  uint16_t i = m_firstIdx + idx;
+  if (m_ledController->size() <= (int)i)
+    return nullptr;
+  return &m_ledController->leds()[i];
+}
+
+void SegmentPart::dirty()
+{
+  FastLED_Action::instance().setLedControllerHasChanges(m_ledController);
 }
 
 // --------------------------------------------------------------------
@@ -137,17 +179,17 @@ void SegmentCommon::loop()
   }
 }
 
-void SegmentCommon::render()
+void SegmentCommon::dirty()
 {
   // do upcast to correct type
   switch(m_type){
   case T_Segment: {
     Segment *seg = reinterpret_cast<Segment*>(this);
-    seg->render();
+    seg->dirty();
   }  break;
   case T_Compound: {
     SegmentCompound *comp = reinterpret_cast<SegmentCompound*>(this);
-    comp->render();
+    comp->dirty();
   }  break;
   default:
     break; // do nothing
@@ -179,39 +221,39 @@ Segment::~Segment()
 {
 }
 
-void Segment::addLedController(CLEDController *part)
+void Segment::addSegmentPart(SegmentPart *part)
 {
-  m_ledControllers.push(part);
+  m_segmentParts.push(part);
 }
 
-size_t Segment::ledControllerSize() const
+size_t Segment::ledSegmentPartSize() const
 {
-  return m_ledControllers.length();
+  return m_segmentParts.length();
 }
 
-void Segment::removeLedController(size_t idx)
+void Segment::removeSegmentPart(size_t idx)
 {
-  m_ledControllers.remove(idx);
+  m_segmentParts.remove(idx);
 }
 
-CLEDController* Segment::ledControllerAt(size_t idx)
+SegmentPart* Segment::segmentPartAt(size_t idx)
 {
-  return m_ledControllers[idx];
+  return m_segmentParts[idx];
 }
 
-Segment::ControllerList &Segment::controllerList()
+Segment::PartsList &Segment::segmentPartsList()
 {
-  return m_ledControllers;
+  return m_segmentParts;
 }
 
 CRGB *Segment::operator[] (uint16_t idx)
 {
   uint16_t led = 0;
-  for (CLEDController *part = m_ledControllers.first();
-      m_ledControllers.canMove(); part = m_ledControllers.next())
+  for (SegmentPart *part = m_segmentParts.first();
+      m_segmentParts.canMove(); part = m_segmentParts.next())
   {
     if (led + part->size() > idx) {
-      return &(*part)[idx - led]; // found it!
+      return (*part)[idx - led]; // found it!
     }
     led += part->size();
   }
@@ -221,21 +263,21 @@ CRGB *Segment::operator[] (uint16_t idx)
 uint16_t Segment::size()
 {
   uint16_t sz = 0;
-  for (CLEDController *part = m_ledControllers.first();
-      m_ledControllers.canMove(); part = m_ledControllers.next())
+  for (SegmentPart *part = m_segmentParts.first();
+      m_segmentParts.canMove(); part = m_segmentParts.next())
   {
     sz += part->size();
   }
   return sz;
 }
 
-void Segment::render()
+void Segment::dirty()
 {
-  for(auto cont = m_ledControllers.begin();
-      m_ledControllers.canMove();
-      cont = m_ledControllers.next())
+  for(auto part = m_segmentParts.begin();
+      m_segmentParts.canMove();
+      part = m_segmentParts.next())
   {
-    cont->showLeds();
+    part->dirty();
   }
 }
 
@@ -262,7 +304,15 @@ size_t SegmentCompound::segmentSize() const
   return m_segments.length();
 }
 
-void SegmentCompound::removeSegment(size_t idx)
+void SegmentCompound::removeSegment(Segment *segment)
+{
+  for(uint16_t i = 0; i < m_segments.length(); ++i) {
+    if (m_segments[i] == segment)
+      removeSegmentByIdx(i);
+  }
+}
+
+void SegmentCompound::removeSegmentByIdx(size_t idx)
 {
   FastLED_Action::registerItem(m_segments[idx]); // re-register for loop control
   m_segments.remove(idx);
@@ -289,6 +339,15 @@ CRGB* SegmentCompound::operator [](uint16_t idx)
     }
     led += segment->size();
   }
+  // look in sub-compounds
+  for (SegmentCompound *compound = m_compounds.first();
+      m_compounds.canMove(); compound = m_compounds.next())
+  {
+    if (led + compound->size() > idx) {
+      return (*compound)[idx - led]; // found it!
+    }
+    led += compound->size();
+  }
   return nullptr;
 }
 
@@ -300,12 +359,18 @@ uint16_t SegmentCompound::size()
   {
     sz += segment->size();
   }
+
+  for (SegmentCompound *compound = m_compounds.first();
+      m_compounds.canMove(); compound = m_compounds.next())
+  {
+    sz += compound->size();
+  }
   return sz;
 }
 
 void SegmentCompound::addCompound(SegmentCompound *compound)
 {
-  FastLED_Action::registerItem(compound); // loop is controlled by this
+  FastLED_Action::unregisterItem(compound); // loop is controlled by this
                                           // compound from here on
   m_compounds.push(compound);
 }
@@ -315,7 +380,15 @@ size_t SegmentCompound::compoundSize() const
   return m_compounds.length();
 }
 
-void SegmentCompound::removeCompound(size_t idx)
+void SegmentCompound::removeCompound(SegmentCompound *compound)
+{
+  for(uint16_t i = 0; i < m_compounds.length(); ++i) {
+    if (m_compounds[i] == compound)
+      removeCompoundByIdx(i);
+  }
+}
+
+void SegmentCompound::removeCompoundByIdx(size_t idx)
 {
   FastLED_Action::registerItem(m_compounds[idx]);// re-register for loop control
   m_compounds.remove(idx);
@@ -327,18 +400,18 @@ SegmentCompound* SegmentCompound::compoundAt(size_t idx)
 }
 
 
-void SegmentCompound::render()
+void SegmentCompound::dirty()
 {
    for (Segment *segment = m_segments.first();
        m_segments.canMove(); segment = m_segments.next())
    {
-     segment->render();
+     segment->dirty();
    }
 
    for(SegmentCompound *comp = m_compounds.first();
        m_compounds.canMove(); comp = m_compounds.next())
    {
-     comp->render();
+     comp->dirty();
    }
 }
 

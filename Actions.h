@@ -45,6 +45,7 @@ public:
   size_t actionsSize() const;
   void addAction(ActionBase *action);
   void removeAction(ActionBase *action);
+  void removeActionByIdx(size_t idx);
   ActionBase* actionsCurrent();
   void nextAction();
   uint16_t currentActionIdx();

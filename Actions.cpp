@@ -67,6 +67,12 @@ void ActionsContainer::removeAction(ActionBase *action)
   }
 }
 
+void ActionsContainer::removeActionByIdx(size_t idx)
+{
+  if (m_actions.length() > idx)
+    removeAction(m_actions[idx]);
+}
+
 ActionBase* ActionsContainer::actionsCurrent()
 {
   if (m_actions.length())
@@ -186,13 +192,13 @@ void ActionColor::loopCB(ActionBase *self, SegmentCommon *owner)
 void ActionColor::loop(SegmentCommon *owner)
 {
   if (m_endTime == 0) {
-    Serial.print("start color loop:");Serial.println(cRgbToUInt(m_color), 16);
-    Serial.print("this:");Serial.println((int)this);
+    //Serial.print("start color loop:");Serial.println(cRgbToUInt(m_color), 16);
+    //Serial.print("this:");Serial.println((int)this);
     for(uint16_t i = 0, end = owner->size(); i < end; ++i) {
       CRGB *rgb = (*owner)[i];
       *rgb = m_color;
     }
-    owner->render();
+    owner->dirty();
   }
 
   ActionBase::loop(owner);
@@ -244,7 +250,7 @@ void ActionIncColor::loop(SegmentCommon *owner)
         rgb->raw[c] = round(color);
       }
     }
-    owner->render();
+    owner->dirty();
   }
 
   ActionBase::loop(owner);
@@ -308,7 +314,7 @@ void ActionDimAll::loop(SegmentCommon *owner)
       rgb->green = g;
       rgb->blue = b;
     }
-    owner->render();
+    owner->dirty();
   }
 
   // call subclass

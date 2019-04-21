@@ -27,42 +27,18 @@
 #include "Actions.h"
 
 
-/**
- * @breif: a segment of leds within a single LED data out
- */
-/*
-class SegmentPart {
-  uint8_t m_firstIdx,
-           m_noLeds;
-  CLEDController *m_ledController;
-  bool m_hasChanges;
-
-public:
-  SegmentPart(CLEDController *controller, uint8_t firstLed, uint8_t noLeds);
-  ~SegmentPart();
-
-  void setLedController(CLEDController *controller);
-
-  uint8_t firstLedIdx() const { return m_firstIdx; }
-  uint8_t lastLedIdx() const { return m_firstIdx + m_noLeds; }
-  uint16_t size() const { return m_noLeds; }
-  CRGB *operator [] (uint8_t idx) const;
-
-  bool hasChanges() const { return m_hasChanges; }
-  void setHasChanges(bool hasChanges) { m_hasChanges = hasChanges; }
-};
-*/
-
-
 class SegmentCommon;
 class Segment;
 class SegmentCompound;
 
 class FastLED_Action {
   DListDynamic<SegmentCommon*> m_items;
+  static const uint8_t MAX_CHANNEL_COUNT = 10; // how many LED i/o port we can have
+  CLEDController* m_dirtyControllers[MAX_CHANNEL_COUNT];
   static FastLED_Action s_instance;
   void _registerItem(SegmentCommon *item);
   void _unregisterItem(SegmentCommon *item);
+  void _render();
 public:
   FastLED_Action();
   ~FastLED_Action();
@@ -75,6 +51,36 @@ public:
   static FastLED_Action &instance();
   /// should be called from loop() in root *.ino file
   static void loop();
+
+  /// triggers a resend on each LED controller list
+  void setLedControllerHasChanges(CLEDController *controller);
+  bool ledControllerHasChanges(CLEDController *controller);
+};
+
+// ----------------------------------------------------------
+
+/**
+ * @breif: a segment of leds within a single LED data out
+ */
+
+class SegmentPart {
+  uint8_t m_firstIdx,
+           m_noLeds;
+  CLEDController *m_ledController;
+
+public:
+  SegmentPart(CLEDController *controller, uint8_t firstLed, uint8_t noLeds);
+  ~SegmentPart();
+
+  void setLedController(CLEDController *controller);
+  CLEDController *ledController() { return m_ledController; }
+
+  uint8_t firstLedIdx() const { return m_firstIdx; }
+  uint8_t lastLedIdx() const { return m_firstIdx + m_noLeds; }
+  uint16_t size() const { return m_noLeds; }
+  CRGB *operator [] (uint8_t idx) const;
+
+  void dirty();
 };
 
 
@@ -100,7 +106,7 @@ public:
   virtual CRGB* operator [] (uint16_t idx) = 0;
   virtual uint16_t size() = 0;
 
-  void render();
+  void dirty();
 
 
   /// waits for next action to occur
@@ -122,26 +128,26 @@ protected:
  */
 class Segment : public SegmentCommon {
 public:
-  typedef DListDynamic<CLEDController*> ControllerList;
+  typedef DListDynamic<SegmentPart*> PartsList;
   Segment();
   ~Segment();
 
   // add a subsegment to this segment, built up of several SegmentParts
   // a segment might be contained within several different data I/O pins
   // hence might have many controllers
-  void addLedController(CLEDController *part);
-  size_t ledControllerSize() const;
-  void removeLedController(size_t idx);
-  CLEDController* ledControllerAt(size_t idx);
-  ControllerList &controllerList();
+  void addSegmentPart(SegmentPart *part);
+  size_t ledSegmentPartSize() const;
+  void removeSegmentPart(size_t idx);
+  SegmentPart* segmentPartAt(size_t idx);
+  PartsList &segmentPartsList();
 
   // LEDs
   CRGB *operator [] (uint16_t idx);
   uint16_t size();
 
-  void render();
+  void dirty();
 private:
-  ControllerList m_ledControllers;
+  PartsList m_segmentParts;
 };
 
 // -----------------------------------------------------------
@@ -160,14 +166,16 @@ public:
   /// add segment to to this compound
   void addSegment(Segment *segment);
   size_t segmentSize() const;
-  void removeSegment(size_t idx);
+  void removeSegmentByIdx(size_t idx);
+  void removeSegment(Segment *segment);
   Segment* segmentAt(size_t idx);
   SegmentList &segmentsList();
 
   /// add sub compound to this compound
   void addCompound(SegmentCompound *compound);
   size_t compoundSize() const;
-  void removeCompound(size_t idx);
+  void removeCompoundByIdx(size_t idx);
+  void removeCompound(SegmentCompound *compound);
   SegmentCompound* compoundAt(size_t idx);
   CompoundList &compoundList();
 
@@ -175,7 +183,7 @@ public:
   CRGB *operator [] (uint16_t idx);
   uint16_t size();
 
-  void render();
+  void dirty();
 
 private:
   SegmentList m_segments;
