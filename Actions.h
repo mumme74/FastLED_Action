@@ -164,7 +164,7 @@ public:
 class ActionFade : public ActionBase {
   uint8_t m_toBrightness;
 public:
-  explicit ActionFade(uint8_t toBrightness, uint16_t duration = 1000);
+  explicit ActionFade(uint8_t toBrightness, uint32_t duration = 1000);
   ~ActionFade();
 
   // workaround as we need to upcast to this class on each event
@@ -197,7 +197,7 @@ class ActionSnake : public ActionBase {
 public:
   explicit ActionSnake(CRGB baseColor, CRGB snakeColor,
                        bool reversed = false, bool keepSnakeColor = false,
-                       uint16_t duration = 1000);
+                       uint32_t duration = 1000);
   ~ActionSnake();
 
   // workaround as we need to upcast to this class on each event

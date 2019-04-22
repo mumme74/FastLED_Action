@@ -53,8 +53,8 @@ public:
   static FastLED_Action &instance();
   /// should be called from loop() in root *.ino file
   static void loop();
-  /// starts the program
-  static void runProgram(bool repeat = true);
+  /// starts the program, repeatCount -1 repeats forever
+  static void runProgram(int repeatCount = 0);
 
   static void clearAllActions();
 
@@ -75,7 +75,7 @@ class SegmentPart {
   CLEDController *m_ledController;
 
 public:
-  SegmentPart(CLEDController *controller, uint8_t firstLed, uint8_t noLeds);
+  SegmentPart(CLEDController *controller, uint8_t firstLed, uint8_t nLeds);
   ~SegmentPart();
 
   void setLedController(CLEDController *controller);
@@ -139,7 +139,7 @@ protected:
 class Segment : public SegmentCommon {
 public:
   typedef DListDynamic<SegmentPart*> PartsList;
-  Segment();
+  explicit Segment();
   ~Segment();
 
   // add a subsegment to this segment, built up of several SegmentParts
@@ -171,22 +171,26 @@ class SegmentCompound : public SegmentCommon {
 public:
   typedef DListDynamic<Segment*> SegmentList;
   typedef DListDynamic<SegmentCompound*> CompoundList;
-  SegmentCompound();
+  explicit SegmentCompound();
   ~SegmentCompound();
 
   /// add segment to to this compound
   void addSegment(Segment *segment);
+  void addSegment(Segment &segment) { addSegment(&segment); }
   size_t segmentSize() const;
   void removeSegmentByIdx(size_t idx);
   void removeSegment(Segment *segment);
+  void removeSegment(Segment &segment) { removeSegment(&segment); }
   Segment* segmentAt(size_t idx);
   SegmentList &segmentsList();
 
   /// add sub compound to this compound
   void addCompound(SegmentCompound *compound);
+  void addCompound(SegmentCompound &compound) { addCompound(&compound); }
   size_t compoundSize() const;
   void removeCompoundByIdx(size_t idx);
   void removeCompound(SegmentCompound *compound);
+  void removeCompound(SegmentCompound &compound) { removeCompound(&compound); }
   SegmentCompound* compoundAt(size_t idx);
   CompoundList &compoundList();
 

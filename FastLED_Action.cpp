@@ -81,7 +81,7 @@ void FastLED_Action::loop()
 }
 
 // static
-void FastLED_Action::runProgram(bool repeat)
+void FastLED_Action::runProgram(int repeatCount)
 {
   // this member function makes it possible to run asyncronously
   static bool running = false; // row only run first invocation
@@ -90,7 +90,9 @@ void FastLED_Action::runProgram(bool repeat)
     do {
       s_instance.program();
       s_instance.clearAllActions(); // safety cleanup
-    } while(repeat);
+      if (repeatCount < -1)
+        ++repeatCount;
+    } while(repeatCount--);
     running = false;
   }
 }
@@ -158,8 +160,8 @@ bool FastLED_Action::ledControllerHasChanges(CLEDController *controller)
 
 SegmentPart::SegmentPart(CLEDController *controller,
                          uint8_t firstLed,
-                         uint8_t noLeds) :
-    m_firstIdx(firstLed), m_noLeds(noLeds),
+                         uint8_t nLeds) :
+    m_firstIdx(firstLed), m_noLeds(nLeds),
     m_ledController(controller)
 {
 }

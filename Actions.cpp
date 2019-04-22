@@ -337,7 +337,7 @@ void ActionGotoColor::onEvent(SegmentCommon *owner, EvtType evtType)
 
 // ----------------------------------------------------------------
 
-ActionFade::ActionFade(uint8_t toBrightness, uint16_t duration) :
+ActionFade::ActionFade(uint8_t toBrightness, uint32_t duration) :
     ActionBase(duration),
     m_toBrightness(toBrightness)
 {
@@ -468,7 +468,7 @@ void ActionEaseInOut::onEvent(SegmentCommon *owner, EvtType evtType)
 
 ActionSnake::ActionSnake(CRGB baseColor, CRGB snakeColor,
                          bool reversed, bool keepSnakeColor,
-                         uint16_t duration):
+                         uint32_t duration):
     ActionBase(duration),
     m_baseColor(baseColor), m_snakeColor(snakeColor),
     m_keepSnakeColor(keepSnakeColor),
