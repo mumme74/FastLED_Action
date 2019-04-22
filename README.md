@@ -1,6 +1,11 @@
 # FastLED_Action
 A wrapper around FastLED library to make animations more object oriented and asyncronous.
 
+It depends on *FastLED* (fastled.io) obviously...
+But also on *DList* (github.com/mumme74/DList)
+
+And for the test suite: *testmacros* (github.com/mumme74/testmacros)
+
 # Description
 This Lib is asyncronous and tries to abstract away different sequences and difficoult math's to objects called Actions.
 
@@ -298,8 +303,11 @@ if duration is 1000ms and m_updateTime = 50ms it will be called 20 times
 //   __________________________________
 //  |                                  |
 //   ----------------------------------
-//  Leds strip led1 wraps around the O, L, and partly around Y. but we had to use another LEd strip to complete Y. These 2 strips are Controlled by CLEDController led1c and led2c
-//  The led strip 2 continues around the underline so O and L are connected to led1c and Y and underline to led2c
+//  Leds strip led1 wraps around the O, L, and partly around Y. 
+//  But we had to use another LEd strip to complete Y. 
+//  These 2 strips are Controlled by CLEDController led1c and led2c
+//  The led strip 2 continues around the underline so O and L are connected
+//  to led1c and Y and underline to led2c
 //
 
 
