@@ -39,6 +39,8 @@ class FastLED_Action {
   void _registerItem(SegmentCommon *item);
   void _unregisterItem(SegmentCommon *item);
   void _render();
+  void _clearActions(SegmentCommon *item);
+  void program(); // must implement in root *.ino file
 public:
   FastLED_Action();
   ~FastLED_Action();
@@ -51,6 +53,10 @@ public:
   static FastLED_Action &instance();
   /// should be called from loop() in root *.ino file
   static void loop();
+  /// starts the program
+  static void runProgram(bool repeat = true);
+
+  static void clearAllActions();
 
   /// triggers a resend on each LED controller list
   void setLedControllerHasChanges(CLEDController *controller);
@@ -95,6 +101,8 @@ public:
   explicit SegmentCommon(typeEnum type);
   virtual ~SegmentCommon();
 
+  typeEnum type() const { return m_type; }
+
   // halted status
   bool halted() const;
   void setHalted(bool halt);
@@ -112,8 +120,10 @@ public:
   /// waits for next action to occur
   /// if duration is 0 (forever action) or if we are halted
   /// it returns immediately
+  /// noOfActions is how many actions we wait until we return
   /// returns time in ms that it has been of
-  uint32_t yieldUntilNextAction();
+  uint32_t yieldUntilAction(uint16_t noOfActions = 1);
+  uint32_t yieldUntilAction(ActionBase &action);
 
 protected:
   typeEnum m_type;
@@ -136,6 +146,7 @@ public:
   // a segment might be contained within several different data I/O pins
   // hence might have many controllers
   void addSegmentPart(SegmentPart *part);
+  void addSegmentPart(SegmentPart &part) { addSegmentPart(&part); }
   size_t segmentPartSize() const;
   void removeSegmentPart(size_t idx);
   SegmentPart* segmentPartAt(size_t idx);

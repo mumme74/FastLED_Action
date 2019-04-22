@@ -44,9 +44,10 @@ public:
   // Actions
   size_t actionsSize() const;
   void addAction(ActionBase *action);
+  void addAction(ActionBase &action);
   void removeAction(ActionBase *action);
+  void removeAction(ActionBase &action);
   void removeActionByIdx(size_t idx);
-  ActionBase* actionsCurrent();
   void nextAction();
   uint16_t currentActionIdx();
   void setCurrentActionIdx(uint16_t idx);
@@ -80,10 +81,16 @@ public:
   /// duration of 0 is a forever action
   uint32_t duration() const { return m_duration; }
 
+  /// what time action was started
   uint32_t startTime() const {
     return m_endTime > 0 ? m_endTime - m_duration : 0;
   }
+  /// what time action will end
   uint32_t endTime() const { return m_endTime; }
+  ///how many tick this action has from start to finish
+  uint32_t noOfTicks() const;
+  /// which tick we are currently at
+  uint16_t tickCount() const;
 
   bool isSingleShot() const { return m_singleShot; }
   void setSingleShot(bool singleShot) { m_singleShot = singleShot; }
@@ -139,11 +146,9 @@ public:
 
 // ----------------------------------------------------
 
-/// dims all leds simultaneously from -> to during duration time
+/// changes all leds from -> to during duration time
 class ActionGotoColor : public ActionBase {
   CRGB m_fromColor, m_toColor;
-  uint16_t m_iterations;
-  int16_t m_incR, m_incG, m_incB;
 public:
   explicit ActionGotoColor(CRGB fromColor, CRGB toColor, uint32_t duration = 1000);
   virtual ~ActionGotoColor();
@@ -155,6 +160,50 @@ public:
 
 // -----------------------------------------------------
 
+/// changes all LED in brightness
+class ActionFade : public ActionBase {
+  uint8_t m_toBrightness;
+public:
+  explicit ActionFade(uint8_t toBrightness, uint16_t duration = 1000);
+  ~ActionFade();
+
+  // workaround as we need to upcast to this class on each event
+  static void eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType);
+  virtual void onEvent(SegmentCommon *owner, EvtType evtType);
+};
+
+// -----------------------------------------------------
+
+class ActionEaseInOut : public ActionBase {
+  CRGB m_toColor;
+  uint8_t m_easeFactor, m_rDiff, m_gDiff, m_bDiff;
+
+public:
+  explicit ActionEaseInOut(CRGB toColor, int8_t easeTo, uint16_t duration = 1000);
+  ~ActionEaseInOut();
+
+  // workaround as we need to upcast to this class on each event
+  static void eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType);
+  virtual void onEvent(SegmentCommon *owner, EvtType evtType);
+};
+
+
+// -----------------------------------------------------
+
+class ActionSnake : public ActionBase {
+  CRGB m_baseColor, m_snakeColor;
+  bool m_reversed, m_keepSnakeColor;
+  uint16_t m_snakeIdx;
+public:
+  explicit ActionSnake(CRGB baseColor, CRGB snakeColor,
+                       bool reversed = false, bool keepSnakeColor = false,
+                       uint16_t duration = 1000);
+  ~ActionSnake();
+
+  // workaround as we need to upcast to this class on each event
+  static void eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType);
+  virtual void onEvent(SegmentCommon *owner, EvtType evtType);
+};
 
 
 #endif /* ACTIONS_H_ */

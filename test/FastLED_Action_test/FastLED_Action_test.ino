@@ -83,7 +83,7 @@ void testSingleChSegment(){
   test(seg.actionsSize(), 2);
   test(seg.currentActionIdx(), 0);
 
-  seg.yieldUntilNextAction();
+  seg.yieldUntilAction();
 
   test(actColor.isFinished(), true);
   time = millis() - time;
@@ -114,7 +114,7 @@ void testSingleChSegment(){
   seg.setHalted(false);
 
   // check so we change color
-  seg.yieldUntilNextAction();
+  seg.yieldUntilAction();
   time = millis() - time;
   checkTime(time, 850, __LINE__); // we run actDark twice
   time = millis();
@@ -135,7 +135,7 @@ void testSingleChSegment(){
   // test so we don't autodelete to early
   testDelay(900 - (millis() - time));
   test(seg.actionsSize(), 2);
-  time = seg.yieldUntilNextAction();
+  time = seg.yieldUntilAction();
   test(seg.actionsSize(), 1);
 }
 
@@ -206,7 +206,7 @@ void testSegmentManyChannels(){
   test(FastLED_Action::instance().ledControllerHasChanges(cont_ch2), false);
   test(FastLED_Action::instance().ledControllerHasChanges(cont_ch3), false);;
 
-  seg.yieldUntilNextAction();
+  seg.yieldUntilAction();
   test((uint32_t)seg.currentAction(), (uint32_t)&actDark);
   FastLED_Action::loop();
 
@@ -255,7 +255,7 @@ void testCompound(){
 
   // test that yield don't block if we are halted
   seg1.setHalted(true);
-  uint32_t time = seg1.yieldUntilNextAction();
+  uint32_t time = seg1.yieldUntilAction();
   test(time, 0);
   seg1.setHalted(false);
   FastLED_Action::loop();
@@ -268,7 +268,7 @@ void testCompound(){
   checkAllSegmentPartColors(segPart2_ch2, CRGB::Blue, __LINE__);
   checkAllSegmentPartColors(segPart1_ch3, CRGB::Blue, __LINE__);
 
-  seg1.yieldUntilNextAction();
+  seg1.yieldUntilAction();
 
   // test so compound detaches segment from loop
   ActionDark actDark1, actDark2, actDark3;
@@ -303,7 +303,7 @@ void testCompound(){
   checkAllSegmentPartColors(segPart2_ch2, CRGB::Aqua, __LINE__);
   checkAllSegmentPartColors(segPart1_ch3, CRGB::Aqua, __LINE__);
 
-  compound.yieldUntilNextAction();
+  compound.yieldUntilAction();
   FastLED_Action::loop();
   checkAllSegmentPartColors(segPart1_ch1, CRGB::White, __LINE__);
   checkAllSegmentPartColors(segPart2_ch1, CRGB::White, __LINE__);
@@ -321,7 +321,7 @@ void testCompound(){
   // make sure it is turning black
   checkAllSegmentPartColors(segPart1_ch1, CRGB::Red, __LINE__);
   checkAllSegmentPartColors(segPart2_ch1, CRGB::Red, __LINE__);
-  seg1.yieldUntilNextAction();
+  seg1.yieldUntilAction();
   FastLED_Action::loop();
   checkAllSegmentPartColors(segPart1_ch1, CRGB::Black, __LINE__);
   checkAllSegmentPartColors(segPart2_ch1, CRGB::Black, __LINE__);
@@ -342,7 +342,7 @@ void testCompound(){
   checkAllSegmentPartColors(segPart2_ch2, CRGB::Beige, __LINE__);
   checkAllSegmentPartColors(segPart1_ch3, CRGB::Beige, __LINE__);
 
-  comp2.yieldUntilNextAction();
+  comp2.yieldUntilAction();
   FastLED_Action::loop();
 
   // make sure we have detached first compound for loop control
@@ -388,7 +388,7 @@ void testActions(){
     checkAllSegmentPartColors(segPart2_ch1, CRGB::Red, __LINE__);
     checkAllSegmentPartColors(segPart3_ch1, CRGB::Red, __LINE__);
 
-    seg1.yieldUntilNextAction();
+    seg1.yieldUntilAction();
     FastLED_Action::loop();
     test(seg1.actionsSize(), 2);
 
@@ -396,7 +396,7 @@ void testActions(){
     checkAllSegmentPartColors(segPart2_ch1, CRGB::Green, __LINE__);
     checkAllSegmentPartColors(segPart3_ch1, CRGB::Green, __LINE__);
 
-    seg1.yieldUntilNextAction();
+    seg1.yieldUntilAction();
     FastLED_Action::loop();
     test(seg1.actionsSize(), 1);
 
@@ -404,7 +404,7 @@ void testActions(){
     checkAllSegmentPartColors(segPart2_ch1, CRGB::Blue, __LINE__);
     checkAllSegmentPartColors(segPart3_ch1, CRGB::Blue, __LINE__);
 
-    seg1.yieldUntilNextAction();
+    seg1.yieldUntilAction();
     FastLED_Action::loop();
     test(seg1.actionsSize(), 0);
 
@@ -419,24 +419,26 @@ void testActions(){
     FastLED_Action::loop();
     uint32_t time = millis();
     checkAllSegmentPartColors(segPart1_ch1, CRGB::Aqua, __LINE__);
-    seg1.yieldUntilNextAction();
+    seg1.yieldUntilAction();
     checkTime(millis() - time, 1050, __LINE__);
     FastLED_Action::loop();
     time = millis();
     checkAllSegmentPartColors(segPart1_ch1, CRGB::Orange, __LINE__);
-    seg1.yieldUntilNextAction();
+    seg1.yieldUntilAction();
     checkTime(millis() - time, 2050, __LINE__);
     FastLED_Action::loop();
     time = millis();
     checkAllSegmentPartColors(segPart1_ch1, CRGB::DarkGray, __LINE__);
-    seg1.yieldUntilNextAction();
+    seg1.yieldUntilAction();
     checkTime(millis() - time, 950, __LINE__);
     testTypeHint((uint32_t)seg1.currentAction(), (uint32_t)&actGoColor1, uint32_t);
     checkAllSegmentPartColors(segPart1_ch1, CRGB::Red, __LINE__);
 
-    seg1.removeAction(&actGoColor1);
-    seg1.removeAction(&actGoColor2);
-    seg1.removeAction(&actGoColor3);
+    // remove all actions
+    while(seg1.actionsSize() > 0)
+      seg1.removeActionByIdx(0);
+
+    test(seg1.actionsSize(), 0);
 
     // test Color Ladder
     ActionColorLadder actLadder1(CRGB::Black, CRGB::White);
@@ -446,7 +448,65 @@ void testActions(){
     testTypeHint(cRgbToUInt(*seg1[0]), CRGB::Black, uint32_t);
     testTypeHint(cRgbToUInt(*seg1[(seg1.size() +1) / 2]), 0x828282, uint32_t);
     testTypeHint(cRgbToUInt(*seg1[seg1.size() -1]), 0xFFFFFF, uint32_t);
-    seg1.yieldUntilNextAction();
+    seg1.yieldUntilAction();
+
+    seg1.removeAction(&actLadder1);
+
+    // begin test brightness
+    for (uint16_t i = 0, sz = seg1.size(); i < sz; ++i)
+      *seg1[i] = CRGB::White;
+
+    ActionFade actBright1(10);
+    seg1.addAction(actBright1);
+    FastLED_Action::loop();
+    testTypeHint(cRgbToUInt(*seg1[seg1.size() -1]), 0xFFFFFF, uint32_t);
+    FastLED_Action::loop();
+    seg1.yieldUntilAction();
+    testTypeHint(cRgbToUInt(*seg1[seg1.size() -1]), 0x111111, uint32_t);
+
+    while(seg1.actionsSize())
+      seg1.removeActionByIdx(0);
+
+    // begin test snake
+    for (uint16_t i = 0, sz = seg1.size(); i < sz; ++i)
+      *seg1[i] = CRGB::White;
+
+    ActionSnake actSnake1(CRGB::Aqua, CRGB::White), actSnake2(CRGB::White, CRGB::Aqua, true, 500);
+    seg1.addAction(actSnake1);
+    seg1.addAction(actSnake2);
+
+    FastLED_Action::loop();
+    testTypeHint(cRgbToUInt(*seg1[0]), CRGB::White, uint32_t);
+    testTypeHint(cRgbToUInt(*seg1[seg1.size() -1]), CRGB::Aqua, uint32_t);
+    seg1.yieldUntilAction();
+
+    testTypeHint(cRgbToUInt(*seg1[0]), CRGB::Aqua, uint32_t);
+    testTypeHint(cRgbToUInt(*seg1[seg1.size() -1]), CRGB::White, uint32_t);
+
+    FastLED_Action::loop();
+    testTypeHint(cRgbToUInt(*seg1[0]), CRGB::White, uint32_t);
+    testTypeHint(cRgbToUInt(*seg1[seg1.size() -1]), CRGB::Aqua, uint32_t);
+    seg1.yieldUntilAction();
+
+    testTypeHint(cRgbToUInt(*seg1[0]), CRGB::Aqua, uint32_t);
+    testTypeHint(cRgbToUInt(*seg1[seg1.size() -1]), CRGB::White, uint32_t);
+    while(seg1.actionsSize()> 0)
+      seg1.removeActionByIdx(0);
+
+    // test EaseInOut
+    ActionEaseInOut actEaseOut(CRGB::Gray, -31), actEaseIn(CRGB::White, +31);
+    seg1.addAction(actEaseOut);
+    seg1.addAction(actEaseIn);
+    for(uint16_t i = 0, sz = seg1.size(); i < sz; ++i)
+      *seg1[i] = CRGB::White;
+
+    FastLED_Action::loop();
+    seg1.yieldUntilAction();
+    testTypeHint(cRgbToUInt(*seg1[0]), 0x666666, uint32_t);
+
+    FastLED_Action::loop();
+    seg1.yieldUntilAction();
+    testTypeHint(cRgbToUInt(*seg1[0]), 0xFFFFFF, uint32_t);
 }
 
 void runTests(){
@@ -456,18 +516,22 @@ void runTests(){
   testSegmentManyChannels();
   testCompound();
   testActions();
-
-
   testEnd();
+}
+
+// normally our program ends up here
+void FastLED_Action::program()
+{
+  testLoop();
 }
 
 
 void setup() {
   delay(100);
-  Serial.begin(115000);
+  Serial.begin(115200);
 }
 
 void loop(){
-  testLoop();
+  FastLED_Action::runProgram();
   FastLED_Action::loop();
 }

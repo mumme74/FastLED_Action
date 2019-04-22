@@ -50,6 +50,12 @@ size_t ActionsContainer::actionsSize() const
 void ActionsContainer::addAction(ActionBase *action)
 {
   m_actions.push(action);
+  Serial.print("add action length:");Serial.println(m_actions.length());
+}
+
+void ActionsContainer::addAction(ActionBase &action)
+{
+  addAction(&action);
 }
 
 void ActionsContainer::removeAction(ActionBase *action)
@@ -67,17 +73,15 @@ void ActionsContainer::removeAction(ActionBase *action)
   }
 }
 
+void ActionsContainer::removeAction(ActionBase &action)
+{
+  removeAction(&action);
+}
+
 void ActionsContainer::removeActionByIdx(size_t idx)
 {
   if (m_actions.length() > idx)
     removeAction(m_actions[idx]);
-}
-
-ActionBase* ActionsContainer::actionsCurrent()
-{
-  if (m_actions.length())
-    return m_actions[m_currentIdx];
-  return nullptr;
 }
 
 void ActionsContainer::nextAction()
@@ -87,7 +91,8 @@ void ActionsContainer::nextAction()
   if (m_actions.length() == m_currentIdx)
     m_currentIdx = 0;
 
-  Serial.print("next action:");Serial.println(m_currentIdx);
+  Serial.print("next action:");Serial.print(m_currentIdx);
+  Serial.print(" actions.length:");Serial.println(m_actions.length());
 }
 
 uint16_t ActionsContainer::currentActionIdx()
@@ -121,11 +126,21 @@ ActionBase::ActionBase(uint32_t duration) :
 {
 }
 
-// how many ms between each re-render
-const uint8_t ActionBase::DefaultTickMs = 70;
+// how many ms between each re-render 50 = 20Hz
+const uint8_t ActionBase::DefaultTickMs = 50;
 
 ActionBase::~ActionBase()
 {
+}
+
+uint32_t ActionBase::noOfTicks() const
+{
+  return m_duration / m_updateTime;
+}
+
+uint16_t ActionBase::tickCount() const
+{
+  return (millis() - startTime()) / m_updateTime;
 }
 
 bool ActionBase::isRunning() const
@@ -269,22 +284,6 @@ ActionGotoColor::ActionGotoColor(CRGB fromColor, CRGB toColor, uint32_t duration
     ActionBase(duration),
     m_fromColor(fromColor), m_toColor(toColor)
 {
-  // calculate how far away each color is and how much they should change each 70ms
-  int16_t redDiff   = toColor.red - fromColor.red,
-          greenDiff = toColor.green - fromColor.green,
-          blueDiff  = toColor.blue  - fromColor.blue;
-  int16_t maxDiff = max(max(redDiff, greenDiff), blueDiff),
-          minDiff = min(min(redDiff, greenDiff), blueDiff);
-  if ((-maxDiff) > minDiff)
-    // darker color wins
-    m_iterations = -minDiff / (duration || 1); // negate minDiff as we don't want
-                                               // negative m_iterations
-  else
-    m_iterations = maxDiff / (duration || 1);
-
-  m_incR = (redDiff / m_iterations) || 1;
-  m_incG = (greenDiff / m_iterations) || 1;
-  m_incB = (blueDiff / m_iterations) || 1;
 }
 
 ActionGotoColor::~ActionGotoColor()
@@ -306,13 +305,22 @@ void ActionGotoColor::onEvent(SegmentCommon *owner, EvtType evtType)
     g = m_fromColor.green;
     b = m_fromColor.blue;
     break;
-  case Tick:
-    r = m_toColor.red - m_incR;
-    g = m_toColor.green - m_incG;
-    b = m_toColor.blue - m_incB;
-    break;
-  case End: // fallthrough
-  default:
+  case Tick: {
+    // calculate how far away each color is and how much they should change each 70ms
+    int16_t redDiff   = m_toColor.red - m_fromColor.red,
+            greenDiff = m_toColor.green - m_fromColor.green,
+            blueDiff  = m_toColor.blue  - m_fromColor.blue;
+    uint16_t iterations = noOfTicks();
+
+    uint8_t incR = (redDiff / iterations) || 1,
+            incG = (greenDiff / iterations) || 1,
+            incB = (blueDiff / iterations) || 1;
+    uint16_t tickCnt = tickCount();
+    r = m_toColor.red - incR * tickCnt;
+    g = m_toColor.green - incG * tickCnt;
+    b = m_toColor.blue - incB * tickCnt;
+  }  break;
+  case End:
     r = m_toColor.red;
     g = m_toColor.green;
     b = m_toColor.blue;
@@ -327,6 +335,197 @@ void ActionGotoColor::onEvent(SegmentCommon *owner, EvtType evtType)
   owner->dirty();
 }
 
+// ----------------------------------------------------------------
+
+ActionFade::ActionFade(uint8_t toBrightness, uint16_t duration) :
+    ActionBase(duration),
+    m_toBrightness(toBrightness)
+{
+  if (m_toBrightness > 100)
+    m_toBrightness = 100;
+}
+
+ActionFade::~ActionFade()
+{
+}
+
+void ActionFade::eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType)
+{
+  reinterpret_cast<ActionFade*>(self)->onEvent(owner, evtType);
+}
+
+void ActionFade::onEvent(SegmentCommon *owner, EvtType evtType)
+{
+  uint8_t fadeFactor = 0;
+
+  switch(evtType){
+    case Start:
+      fadeFactor = 0;
+      break;
+    case Tick: {
+      if (tickCount() >= noOfTicks() -1)
+        return;
+      fadeFactor = 255 - m_toBrightness;
+      fadeFactor = (float)fadeFactor / (noOfTicks() - tickCount());
+    } break;
+    case End:
+      fadeFactor = 0; //255 - m_toBrightness;
+      break;
+    default:
+      return; // do nothing
+  }
+
+  //Serial.println(fadeFactor);
+  //bool printed = false;
+  for(uint16_t i = 0, sz = owner->size(); i < sz; ++i) {
+    CRGB *rgb = (*owner)[i];
+    rgb->fadeLightBy(fadeFactor);
 
 
+//    if (!printed) {
+//      Serial.print("r:");Serial.print(rgb->r);
+//      Serial.print(" g:");Serial.print(rgb->g);
+//      Serial.print(" b:");Serial.println(rgb->b);
+//      printed = true;
+//    }
+
+  }
+}
+
+// ----------------------------------------------------------------
+
+ActionEaseInOut::ActionEaseInOut(CRGB toColor, int8_t easeTo, uint16_t duration) :
+    ActionBase(duration),
+    m_toColor(toColor), m_easeFactor(easeTo),
+    m_rDiff(0), m_gDiff(0), m_bDiff(0)
+{
+}
+
+ActionEaseInOut::~ActionEaseInOut()
+{
+}
+
+void ActionEaseInOut::eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType)
+{
+  reinterpret_cast<ActionSnake*>(self)->onEvent(owner, evtType);
+}
+
+void ActionEaseInOut::onEvent(SegmentCommon *owner, EvtType evtType)
+{
+  switch(evtType) {
+  case Start:{
+    // get the diff of each color to desired color
+    for (uint16_t i = 0, sz = owner->size(); i < sz; ++i) {
+      CRGB *rgb = (*owner)[i];
+      if (rgb->r > m_toColor.r)
+        m_rDiff = max(rgb->r - m_toColor.r, m_rDiff);
+      else
+        m_rDiff = max(m_toColor.r - rgb->r, m_rDiff);
+
+      if (rgb->g > m_toColor.g)
+        m_gDiff = max(rgb->g - m_toColor.g, m_gDiff);
+      else
+        m_gDiff = max(m_toColor.g - rgb->g, m_gDiff);
+
+      if (rgb->b > m_toColor.b)
+        m_bDiff = max(rgb->b - m_toColor.b, m_bDiff);
+      else
+        m_bDiff = max(m_toColor.b - rgb->b, m_bDiff);
+    }
+    uint16_t ticks = noOfTicks();
+    m_rDiff /= ticks;
+    m_gDiff /= ticks;
+    m_bDiff /= ticks;
+  }  break;
+  case Tick: {
+    int8_t step = m_easeFactor / noOfTicks();
+    int8_t curI = step * (tickCount() - noOfTicks());
+    uint8_t factor = ease8InOutQuad((uint8_t)curI);
+    bool printed = false;
+    for (uint16_t i = 0, sz = owner->size(); i < sz; ++i) {
+      CRGB *rgb = (*owner)[i];
+      uint8_t r = rgb->r, g = rgb->g, b = rgb->b;
+      rgb->r = factor * m_rDiff;
+      rgb->g = factor * m_gDiff;
+      rgb->b = factor * m_bDiff;
+      if (!printed) {
+        Serial.print("r:");Serial.print(rgb->r);
+        Serial.print(" g:");Serial.print(rgb->g);
+        Serial.print(" b:");Serial.println(rgb->b);
+        printed = true;
+      }
+    }
+  } break;
+  case End: // fallthrough
+  default: {
+    for (uint16_t i = 0, sz = owner->size(); i < sz; ++i)
+      *(*owner)[i] = m_toColor;
+  }
+  }
+}
+
+// ----------------------------------------------------------------
+
+ActionSnake::ActionSnake(CRGB baseColor, CRGB snakeColor,
+                         bool reversed, bool keepSnakeColor,
+                         uint16_t duration):
+    ActionBase(duration),
+    m_baseColor(baseColor), m_snakeColor(snakeColor),
+    m_keepSnakeColor(keepSnakeColor),
+    m_reversed(reversed), m_snakeIdx(0)
+{
+}
+
+ActionSnake::~ActionSnake()
+{
+}
+
+void ActionSnake::eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType)
+{
+  reinterpret_cast<ActionSnake*>(self)->onEvent(owner, evtType);
+}
+
+void ActionSnake::onEvent(SegmentCommon *owner, EvtType evtType)
+{
+  switch(evtType) {
+  case Tick:
+    if (m_reversed)
+      --m_snakeIdx;
+    else
+      ++m_snakeIdx;
+    break;
+  case Start:
+    // we might have more leds than what is possible within duration
+    if (owner->size() * m_updateTime <= m_duration) {
+      m_updateTime = m_duration / (owner->size() * m_updateTime);
+    }
+    m_snakeIdx = m_reversed ? owner->size() -1 : 0;
+    break;
+  case End:
+    m_snakeIdx = m_reversed ? 0 : owner->size() -1;
+    break;
+  default:
+    m_snakeIdx = 0;
+    break;
+  }
+
+  uint16_t sz = owner->size();
+  uint16_t beginAt = m_keepSnakeColor ? m_snakeIdx :
+                                (m_snakeIdx > 0 ? m_snakeIdx -1 : 0),
+           endAt = sz;
+  int8_t inc = 1;
+  if (m_reversed) {
+    beginAt = m_keepSnakeColor ? m_snakeIdx :
+                                (m_snakeIdx +1 < sz ? m_snakeIdx+1: m_snakeIdx);
+    endAt = 0;
+    inc = -1;
+  }
+  for(uint16_t i = beginAt; i < endAt; i += inc) {
+    CRGB *rgb = (*owner)[i];
+    if (i == m_snakeIdx)
+      *rgb = m_snakeColor;
+    else
+      *rgb = m_baseColor;
+  }
+}
 

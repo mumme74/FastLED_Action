@@ -80,6 +80,27 @@ void FastLED_Action::loop()
   s_instance._render();
 }
 
+// static
+void FastLED_Action::runProgram(bool repeat)
+{
+  // this member function makes it possible to run asyncronously
+  static bool running = false; // row only run first invocation
+  if (!running) {
+    running  = true;
+    do {
+      s_instance.program();
+      s_instance.clearAllActions(); // safety cleanup
+    } while(repeat);
+    running = false;
+  }
+}
+
+// static
+void FastLED_Action::clearAllActions()
+{
+  s_instance._clearActions(nullptr);
+}
+
 void FastLED_Action::_render()
 {
   // render changes
@@ -90,6 +111,24 @@ void FastLED_Action::_render()
       m_dirtyControllers[i] = nullptr;
     }
   }
+}
+
+void FastLED_Action::_clearActions(SegmentCommon *item)
+{
+  if (!item) {
+    for(auto itm = m_items.first(); m_items.canMove(); itm = m_items.next())
+      _clearActions(itm);
+    return;
+  }
+
+  if (item->type() == Segment::T_Compound) {
+    SegmentCompound *comp = reinterpret_cast<SegmentCompound*>(item);
+    for(uint16_t i = 0, sz = comp->compoundSize(); i < sz; ++i)
+      _clearActions(comp->compoundAt(i));
+  }
+
+  while(item->actionsSize() > 0)
+    item->removeActionByIdx(0);
 }
 
 void FastLED_Action::setLedControllerHasChanges(CLEDController *controller)
@@ -196,17 +235,45 @@ void SegmentCommon::dirty()
   }
 }
 
-uint32_t SegmentCommon::yieldUntilNextAction()
+uint32_t SegmentCommon::yieldUntilAction(uint16_t noOfActions)
 {
   ActionBase *action = currentAction();
-  if (m_halted || !action || action->duration() == 0)
+  if (m_halted || !action || noOfActions == 0)
+  {
     return 0;
+  }
 
   uint32_t time = millis();
-  while(action->isRunning()) {
-    yield();
-    loop();
+  do {
+    action = currentAction();
+    if (action && !action->isRunning())
+      FastLED_Action::loop();
+    while(action && action->isRunning()) {
+      yield();
+      loop();
+    }
+  } while(--noOfActions > 0);
+  return millis() - time;
+}
+
+uint32_t SegmentCommon::yieldUntilAction(ActionBase &action)
+{
+  ActionBase *curAction = currentAction();
+  if (m_halted || !curAction)
+  {
+    return 0;
   }
+
+  uint32_t time = millis();
+  do {
+    curAction = currentAction();
+    if (!curAction->isRunning())
+      FastLED_Action::loop();
+    while(curAction->isRunning()) {
+      yield();
+      loop();
+    }
+  } while(curAction != &action);
   return millis() - time;
 }
 
