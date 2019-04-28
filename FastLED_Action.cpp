@@ -161,9 +161,11 @@ bool FastLED_Action::ledControllerHasChanges(CLEDController *controller)
 SegmentPart::SegmentPart(CLEDController *controller,
                          uint8_t firstLed,
                          uint8_t nLeds) :
-    m_firstIdx(firstLed), m_noLeds(nLeds),
+    m_firstIdx(firstLed), m_nLeds(nLeds),
     m_ledController(controller)
 {
+  if (controller)
+    _checkLedsWithinBounds();
 }
 
 SegmentPart::~SegmentPart()
@@ -173,6 +175,7 @@ SegmentPart::~SegmentPart()
 void SegmentPart::setLedController(CLEDController *controller)
 {
   m_ledController = controller;
+  _checkLedsWithinBounds();
 }
 
 CRGB *SegmentPart::operator [] (uint8_t idx) const
@@ -186,6 +189,15 @@ CRGB *SegmentPart::operator [] (uint8_t idx) const
 void SegmentPart::dirty()
 {
   FastLED_Action::instance().setLedControllerHasChanges(m_ledController);
+}
+
+void SegmentPart::_checkLedsWithinBounds()
+{
+  // safetycheck
+  if (m_firstIdx >= m_ledController->size())
+    m_firstIdx = m_ledController->size() -1;
+  if (m_firstIdx + m_nLeds >= m_ledController->size())
+    m_nLeds = m_ledController->size() - m_firstIdx;
 }
 
 // --------------------------------------------------------------------
@@ -252,7 +264,8 @@ uint32_t SegmentCommon::yieldUntilAction(uint16_t noOfActions)
       FastLED_Action::loop();
     while(action && action->isRunning()) {
       yield();
-      loop();
+      this->loop();
+      ::loop(); // loop in root *.ino file
     }
   } while(--noOfActions > 0);
   return millis() - time;

@@ -25,6 +25,7 @@
 #include <FastLED.h>
 #include <DList.h>
 #include "Actions.h"
+#include <Arduino.h>
 
 
 class SegmentCommon;
@@ -71,7 +72,7 @@ public:
 
 class SegmentPart {
   uint8_t m_firstIdx,
-           m_noLeds;
+           m_nLeds;
   CLEDController *m_ledController;
 
 public:
@@ -82,11 +83,13 @@ public:
   CLEDController *ledController() { return m_ledController; }
 
   uint8_t firstLedIdx() const { return m_firstIdx; }
-  uint8_t lastLedIdx() const { return m_firstIdx + m_noLeds; }
-  uint16_t size() const { return m_noLeds; }
+  uint8_t lastLedIdx() const { return m_firstIdx + m_nLeds; }
+  uint16_t size() const { return m_nLeds; }
   CRGB *operator [] (uint8_t idx) const;
 
   void dirty();
+private:
+  void _checkLedsWithinBounds();
 };
 
 
