@@ -286,6 +286,7 @@ uint32_t SegmentCommon::yieldUntilAction(ActionBase &action)
       FastLED_Action::loop();
     while(curAction->isRunning()) {
       yield();
+      ::loop();// loop in root *.ino file
       loop();
     }
   } while(curAction != &action);
@@ -372,6 +373,15 @@ SegmentCompound::SegmentCompound() :
 
 SegmentCompound::~SegmentCompound()
 {
+  // re-register segments to loop control
+  for(uint16_t i = 0; i < m_segments.length(); ++i) {
+    removeSegmentByIdx(i);
+  }
+
+  // re-register compounds to loop control
+  for(uint16_t i = 0; i < m_compounds.length(); ++i) {
+    removeCompoundByIdx(i);
+  }
 }
 
 void SegmentCompound::addSegment(Segment *segment)
