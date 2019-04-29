@@ -132,7 +132,7 @@ ActionBase::ActionBase(uint32_t duration) :
 }
 
 // how many ms between each re-render 50 = 20Hz
-const uint8_t ActionBase::DefaultTickMs = 50;
+const uint8_t ActionBase::DefaultTickMs = 30;//50;
 
 ActionBase::~ActionBase()
 {
@@ -406,7 +406,7 @@ void ActionFade::onEvent(SegmentCommon *owner, EvtType evtType)
       fadeFactor = (float)fadeFactor / (noOfTicks() - tickCount());
     } break;
     case End:
-      fadeFactor = 0; //255 - m_toBrightness;
+      fadeFactor = 255 - m_toBrightness;
       break;
     default:
       return; // do nothing
@@ -418,6 +418,65 @@ void ActionFade::onEvent(SegmentCommon *owner, EvtType evtType)
     CRGB *rgb = (*owner)[i];
     rgb->fadeLightBy(fadeFactor);
 
+
+//    if (!printed) {
+//      Serial.print("r:");Serial.print(rgb->r);
+//      Serial.print(" g:");Serial.print(rgb->g);
+//      Serial.print(" b:");Serial.println(rgb->b);
+//      printed = true;
+//    }
+
+  }
+  owner->dirty();
+}
+
+// ---------------------------------------------------------------
+
+ActionFadeIn::ActionFadeIn(CRGB toColor, uint8_t fromBrightness, uint32_t duration) :
+    ActionBase(duration),
+    m_fromBrightness(fromBrightness),
+    m_toColor(toColor)
+{
+  if (m_fromBrightness > 100)
+    m_fromBrightness = 100;
+}
+
+ActionFadeIn::~ActionFadeIn()
+{
+}
+
+void ActionFadeIn::eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType)
+{
+  reinterpret_cast<ActionFadeIn*>(self)->onEvent(owner, evtType);
+}
+
+void ActionFadeIn::onEvent(SegmentCommon *owner, EvtType evtType)
+{
+  uint16_t fadeFactor = 0;
+
+  switch(evtType){
+    case Start:
+      fadeFactor = 255 - m_fromBrightness;
+      break;
+    case Tick: {
+      if (tickCount() >= noOfTicks() -1)
+        return;
+      fadeFactor = 255 - m_fromBrightness;
+      fadeFactor -= (fadeFactor * tickCount()) / noOfTicks();
+    } break;
+    case End:
+      fadeFactor = 0;
+      break;
+    default:
+      return; // do nothing
+  }
+
+  //Serial.println(fadeFactor);
+  //bool printed = false;
+  for(uint16_t i = 0, sz = owner->size(); i < sz; ++i) {
+    CRGB *rgb = (*owner)[i];
+    *rgb = m_toColor;
+    rgb->fadeLightBy(fadeFactor);
 
 //    if (!printed) {
 //      Serial.print("r:");Serial.print(rgb->r);

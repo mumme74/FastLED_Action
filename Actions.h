@@ -177,7 +177,21 @@ class ActionFade : public ActionBase {
   uint8_t m_toBrightness;
 public:
   explicit ActionFade(uint8_t toBrightness, uint32_t duration = 1000);
-  ~ActionFade();
+  virtual ~ActionFade();
+
+  // workaround as we need to upcast to this class on each event
+  static void eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType);
+  virtual void onEvent(SegmentCommon *owner, EvtType evtType);
+};
+
+// -----------------------------------------------------
+
+class ActionFadeIn : public ActionBase {
+  uint8_t m_fromBrightness;
+  CRGB m_toColor;
+public:
+  explicit ActionFadeIn(CRGB toColor, uint8_t fromBrightness, uint32_t duration = 1000);
+  virtual ~ActionFadeIn();
 
   // workaround as we need to upcast to this class on each event
   static void eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType);
