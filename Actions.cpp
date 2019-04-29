@@ -23,6 +23,9 @@
 #include "FastLED_Action.h"
 
 
+#define sp(txt, vlu) Serial.print(txt);Serial.print(vlu);
+#define spl(txt,vlu) Serial.print(txt);Serial.println(vlu)
+
 uint32_t cRgbToUInt(CRGB &rgb){
   uint32_t col = rgb.r;
   col <<= 8;
@@ -40,6 +43,8 @@ ActionsContainer::ActionsContainer() :
 
 ActionsContainer::~ActionsContainer()
 {
+  while(m_actions.length())
+    removeAction(m_actions[0]);
 }
 
 size_t ActionsContainer::actionsSize() const
@@ -197,6 +202,30 @@ void ActionBase::eventDelegate(SegmentCommon *owner, EvtType evtType)
 
 // --------------------------------------------------
 
+ActionWait::ActionWait(uint32_t duration) :
+    ActionBase(duration)
+{
+}
+
+ActionWait::~ActionWait()
+{
+}
+
+// static
+void ActionWait::eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType)
+{
+  reinterpret_cast<ActionWait*>(self)->onEvent(owner, evtType);
+}
+
+void ActionWait::onEvent(SegmentCommon *owner, EvtType evtType)
+{
+  // do nothing but wait, and that is done in baseclass
+  (void)owner; // squelsh compiler warnings
+  (void)evtType;
+}
+
+// --------------------------------------------------
+
 ActionColor::ActionColor(CRGB color, uint32_t duration) :
     ActionBase(duration),
     m_color(color)
@@ -307,24 +336,32 @@ void ActionGotoColor::onEvent(SegmentCommon *owner, EvtType evtType)
     break;
   case Tick: {
     // calculate how far away each color is and how much they should change each 70ms
-    int16_t redDiff   = m_toColor.red - m_fromColor.red,
-            greenDiff = m_toColor.green - m_fromColor.green,
-            blueDiff  = m_toColor.blue  - m_fromColor.blue;
-    uint16_t iterations = noOfTicks();
+    int16_t redDiff   = m_fromColor.red - m_toColor.red,
+            greenDiff = m_fromColor.green - m_toColor.green,
+            blueDiff  = m_fromColor.blue  - m_toColor.blue;
+    float iterations = noOfTicks();
+    if (iterations < 1)
+      iterations = 1;
 
-    uint8_t incR = (redDiff / iterations) || 1,
-            incG = (greenDiff / iterations) || 1,
-            incB = (blueDiff / iterations) || 1;
+    float incR = (redDiff / iterations),
+            incG = (greenDiff / iterations),
+            incB = (blueDiff / iterations);
     uint16_t tickCnt = tickCount();
     r = m_toColor.red - incR * tickCnt;
     g = m_toColor.green - incG * tickCnt;
     b = m_toColor.blue - incB * tickCnt;
+
+    //sp("rdiff:", redDiff);sp(" g:", greenDiff);spl(" b:", blueDiff);
+    //sp("incR:", incR);sp(" g:", incG);spl(" b:", incB);
   }  break;
   case End:
     r = m_toColor.red;
     g = m_toColor.green;
     b = m_toColor.blue;
   }
+
+
+  sp("r:", r);sp(" g:", g);spl(" b:", b);
 
   for(uint16_t i = 0, end = owner->size(); i < end; ++i) {
     CRGB *rgb = (*owner)[i];
@@ -390,6 +427,7 @@ void ActionFade::onEvent(SegmentCommon *owner, EvtType evtType)
 //    }
 
   }
+  owner->dirty();
 }
 
 // ----------------------------------------------------------------
@@ -438,13 +476,13 @@ void ActionEaseInOut::onEvent(SegmentCommon *owner, EvtType evtType)
     m_bDiff /= ticks;
   }  break;
   case Tick: {
-    int8_t step = m_easeFactor / noOfTicks();
-    int8_t curI = step * (tickCount() - noOfTicks());
-    uint8_t factor = ease8InOutQuad((uint8_t)curI);
+    float step = (float)m_easeFactor / noOfTicks();
+    uint8_t curI = step * (noOfTicks() - tickCount());
+    uint8_t factor = ease8InOutQuad(curI);
+    sp("curI", curI);spl("factor:", factor);
     bool printed = false;
     for (uint16_t i = 0, sz = owner->size(); i < sz; ++i) {
       CRGB *rgb = (*owner)[i];
-      uint8_t r = rgb->r, g = rgb->g, b = rgb->b;
       rgb->r = factor * m_rDiff;
       rgb->g = factor * m_gDiff;
       rgb->b = factor * m_bDiff;
@@ -462,6 +500,7 @@ void ActionEaseInOut::onEvent(SegmentCommon *owner, EvtType evtType)
       *(*owner)[i] = m_toColor;
   }
   }
+  owner->dirty();
 }
 
 // ----------------------------------------------------------------
@@ -487,18 +526,25 @@ void ActionSnake::eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtTyp
 
 void ActionSnake::onEvent(SegmentCommon *owner, EvtType evtType)
 {
+  uint16_t sz = owner->size();
+
   switch(evtType) {
   case Tick:
-    if (m_reversed)
+    if (m_reversed) {
+      if (m_snakeIdx == 0)
+        return;
       --m_snakeIdx;
-    else
+    } else {
+      if (m_snakeIdx + 1 == sz)
+        return;
       ++m_snakeIdx;
+    }
     break;
   case Start:
     // we might have more leds than what is possible within duration
-    if (owner->size() * m_updateTime <= m_duration) {
-      m_updateTime = m_duration / (owner->size() * m_updateTime);
-    }
+    m_updateTime = m_duration / (sz -1);
+    spl("updTime:", m_updateTime);
+    spl("duration:", m_duration);
     m_snakeIdx = m_reversed ? owner->size() -1 : 0;
     break;
   case End:
@@ -509,7 +555,6 @@ void ActionSnake::onEvent(SegmentCommon *owner, EvtType evtType)
     break;
   }
 
-  uint16_t sz = owner->size();
   uint16_t beginAt = m_keepSnakeColor ? m_snakeIdx :
                                 (m_snakeIdx > 0 ? m_snakeIdx -1 : 0),
            endAt = sz;
@@ -517,15 +562,17 @@ void ActionSnake::onEvent(SegmentCommon *owner, EvtType evtType)
   if (m_reversed) {
     beginAt = m_keepSnakeColor ? m_snakeIdx :
                                 (m_snakeIdx +1 < sz ? m_snakeIdx+1: m_snakeIdx);
-    endAt = 0;
+    endAt = 0 -1;
     inc = -1;
   }
-  for(uint16_t i = beginAt; i < endAt; i += inc) {
+  sp("begAt:", beginAt);sp(" endAt:", endAt);spl(" inc:", inc);
+  for(uint16_t i = beginAt; i != endAt; i += inc) {
     CRGB *rgb = (*owner)[i];
-    if (i == m_snakeIdx)
+    if (i == m_snakeIdx || (m_keepSnakeColor && i >= m_snakeIdx))
       *rgb = m_snakeColor;
     else
       *rgb = m_baseColor;
   }
+  owner->dirty();
 }
 

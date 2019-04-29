@@ -67,7 +67,7 @@ protected:
            m_nextIterTime,
            m_duration;
   static const uint8_t DefaultTickMs;
-  uint8_t m_updateTime;
+  uint16_t m_updateTime;
   typedef void (*eventCallback)(ActionBase *self, SegmentCommon *owner, EvtType evtType);
   eventCallback m_eventCB;
 
@@ -145,6 +145,18 @@ public:
 };
 
 // ----------------------------------------------------
+// does nothing but insert a delay in program on this owner.
+class ActionWait : public ActionBase {
+public:
+  explicit ActionWait(uint32_t duration);
+  virtual ~ActionWait();
+
+  // workaround as we need to upcast to this class on each event
+  static void eventCB(ActionBase *self, SegmentCommon *owner, EvtType evtType);
+  virtual void onEvent(SegmentCommon *owner, EvtType evtType);
+};
+
+// ----------------------------------------------------
 
 /// changes all leds from -> to during duration time
 class ActionGotoColor : public ActionBase {
@@ -192,7 +204,7 @@ public:
 
 class ActionSnake : public ActionBase {
   CRGB m_baseColor, m_snakeColor;
-  bool m_reversed, m_keepSnakeColor;
+  bool m_keepSnakeColor, m_reversed;
   uint16_t m_snakeIdx;
 public:
   explicit ActionSnake(CRGB baseColor, CRGB snakeColor,
